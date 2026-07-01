@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Quản Lý Nhập Hàng V4.2.2</title>
+  <link rel="manifest" href="manifest.json?v=4.2.2" />
+  <link rel="stylesheet" href="styles.css?v=4.2.2" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <button id="menuToggle" class="icon-btn" type="button" aria-label="Mở menu" aria-controls="sideNav" aria-expanded="false">&#9776;</button>
+      <div class="app-brand">
+        <h1>Quản Lý Nhập Hàng</h1>
+        <p>V4.2.2 - Lịch sử phân trang</p>
+      </div>
+      <button id="syncBadge" class="sync-badge" type="button">Local</button>
+      <button id="accountBtn" class="account-btn" type="button" aria-label="Tài khoản">Đăng nhập</button>
+      <button id="installBtn" class="btn ghost hidden">Cài app</button>
+    </header>
+
+    <div id="navOverlay" class="nav-overlay" hidden></div>
+    <nav id="sideNav" class="tabs side-nav" aria-label="Điều hướng chính" aria-hidden="true">
+      <div class="side-nav-head">
+        <strong>Menu</strong>
+        <button id="menuClose" class="icon-btn dark" type="button" aria-label="Đóng menu">&#215;</button>
+      </div>
+      <button class="tab active" data-view="dashboard">Dashboard</button>
+      <button class="tab operation-menu-tab" data-view="operations">Vận hành</button>
+      <button class="tab" data-view="history">Lịch sử</button>
+      <button class="tab" data-view="audit" data-permission="stocktake">Kiểm tra</button>
+      <button class="tab" data-view="system" data-auth-required="true">Quản lý</button>
+    </nav>
+
+    <main>
+      <section id="dashboard" class="view active">
+        <article class="card hero">
+          <div class="hero-row">
+            <div><h2>Chào Trung</h2><p id="todayText">Hôm nay</p></div>
+            <span id="routeBadge" class="route-badge">Theo máy</span>
+          </div>
+          <div id="routeMachines" class="chips"></div>
+          <div id="priorityBox" class="priority-box"></div>
+        </article>
+        <div id="summaryBox" class="summary-grid"></div>
+        <article class="card highlight">
+          <div class="section-head"><h2>Đơn nhập hàng máy đang chọn</h2><button id="copyOrderBtn" class="btn small">Copy đơn</button></div>
+          <div id="orderSummaryBox"></div>
+        </article>
+        <article class="card dashboard-tabs-card" aria-label="Chi tiết máy đang chọn">
+          <div class="dashboard-content-tabs" role="tablist" aria-label="Chi tiết Dashboard">
+            <button id="dashboardTabLow" class="dashboard-content-tab active" type="button" role="tab" data-dashboard-tab="low" aria-controls="dashboardPanelLow" aria-selected="true">Tồn thấp</button>
+            <button id="dashboardTabSlow" class="dashboard-content-tab" type="button" role="tab" data-dashboard-tab="slow" aria-controls="dashboardPanelSlow" aria-selected="false">Hàng bán chậm</button>
+            <button id="dashboardTabCabin" class="dashboard-content-tab" type="button" role="tab" data-dashboard-tab="cabin" aria-controls="dashboardPanelCabin" aria-selected="false">Tồn cabin đầy đủ</button>
+          </div>
+          <section id="dashboardPanelLow" class="dashboard-tab-panel active" role="tabpanel" data-dashboard-panel="low" aria-labelledby="dashboardTabLow">
+            <div class="dashboard-panel-hint">Ưu tiên kiểm tra</div>
+            <div id="orderBox"></div>
+          </section>
+          <section id="dashboardPanelSlow" class="dashboard-tab-panel" role="tabpanel" data-dashboard-panel="slow" aria-labelledby="dashboardTabSlow" hidden>
+            <div id="slowBox"></div>
+          </section>
+          <section id="dashboardPanelCabin" class="dashboard-tab-panel" role="tabpanel" data-dashboard-panel="cabin" aria-labelledby="dashboardTabCabin" hidden>
+            <div id="selectedCabinBox"></div>
+          </section>
+        </article>
+      </section>
+
+      <section id="quickfill" class="view">
+        <div class="operation-tabs" role="tablist" aria-label="Vận hành">
+          <button type="button" class="operation-tab active" data-operation-view="quickfill" data-permission="fill">Fill Sản phẩm</button>
+          <button type="button" class="operation-tab" data-operation-view="ncc" data-permission="receive">Nhập Hàng NCC</button>
+          <button type="button" class="operation-tab" data-operation-view="cabin">Tồn cabin</button>
+        </div>
+        <article class="card">
+          <div class="section-head"><h2>Fill Sản phẩm</h2><span class="hint">Nhập xong rồi lưu một lượt</span></div>
+          <div class="form-grid two-col">
+            <label>Ngày <input id="quickDate" type="date" required /></label>
+            <label>Máy <select id="quickMachine"></select></label>
+          </div>
+          <div id="quickFillBox" class="quick-fill-box"></div>
+        </article>
+      </section>
+
+      <section id="ncc" class="view">
+        <div class="operation-tabs" role="tablist" aria-label="Vận hành">
+          <button type="button" class="operation-tab" data-operation-view="quickfill" data-permission="fill">Fill Sản phẩm</button>
+          <button type="button" class="operation-tab active" data-operation-view="ncc" data-permission="receive">Nhập Hàng NCC</button>
+          <button type="button" class="operation-tab" data-operation-view="cabin">Tồn cabin</button>
+        </div>
+        <article class="card">
+          <div class="section-head"><h2>Nhập Hàng NCC hàng loạt</h2><span class="hint">Lưu toàn bộ một lượt</span></div>
+          <form id="nccForm" class="bulk-receive-form">
+            <div class="bulk-receive-toolbar">
+              <label>Ngày <input name="date" type="date" required /></label>
+              <button id="addNccRowBtn" type="button" class="btn ghost">+ Thêm dòng</button>
+            </div>
+            <div class="bulk-table-head" aria-hidden="true"><span>Máy</span><span>Sản phẩm</span><span>Thùng</span><span>Xóa</span></div>
+            <div id="bulkNccRows" class="bulk-ncc-rows"></div>
+            <div id="nccBatchPreview" class="batch-preview"></div>
+            <div class="button-row bulk-actions">
+              <button id="resetNccBatchBtn" type="button" class="btn ghost">Nhập lại</button>
+              <button id="saveNccBatchBtn" type="submit" class="btn primary">Lưu lô NCC</button>
+            </div>
+          </form>
+        </article>
+      </section>
+
+      <section id="cabin" class="view">
+        <div class="operation-tabs" role="tablist" aria-label="Vận hành">
+          <button type="button" class="operation-tab" data-operation-view="quickfill" data-permission="fill">Fill Sản phẩm</button>
+          <button type="button" class="operation-tab" data-operation-view="ncc" data-permission="receive">Nhập Hàng NCC</button>
+          <button type="button" class="operation-tab active" data-operation-view="cabin">Tồn cabin</button>
+        </div>
+        <article class="card">
+          <div class="section-head"><h2>Tồn cabin</h2><span class="hint">Đơn vị: sản phẩm</span></div>
+          <div class="subview-tabs" role="tablist" aria-label="Tồn cabin">
+            <button type="button" class="subview-tab active" data-cabin-view="inventory">Tồn hiện tại</button>
+            <button type="button" class="subview-tab" data-cabin-view="transfer" data-permission="stocktake">Chuyển tồn</button>
+          </div>
+          <section class="cabin-subview active" data-cabin-panel="inventory">
+            <div class="cabin-toolbar">
+              <label>Máy <select id="cabinMachine"></select></label>
+              <button id="exportCabinCsvBtn" type="button" class="btn primary">Xuất CSV</button>
+            </div>
+            <div id="cabinSummary" class="cabin-summary"></div>
+            <div id="cabinBox"></div>
+          </section>
+          <section class="cabin-subview" data-cabin-panel="transfer" hidden>
+            <div class="form-grid transfer-head-grid">
+              <label>Ngày <input id="transferDate" type="date" required /></label>
+              <label>Máy nguồn <select id="transferFromMachine"></select></label>
+              <label>Máy nhận <select id="transferToMachine"></select></label>
+            </div>
+            <div class="section-head compact"><h3>Sản phẩm chuyển</h3><button id="addTransferRowBtn" type="button" class="btn small ghost">+ Sản phẩm</button></div>
+            <div id="transferRows" class="transfer-rows"></div>
+            <label>Ghi chú <input id="transferNote" type="text" maxlength="200" placeholder="Không bắt buộc" /></label>
+            <div id="transferPreview" class="transfer-preview"></div>
+            <div class="button-row bulk-actions">
+              <button id="resetTransferBtn" type="button" class="btn ghost">Nhập lại</button>
+              <button id="saveTransferBtn" type="button" class="btn primary">Lưu phiếu chuyển</button>
+            </div>
+          </section>
+        </article>
+      </section>
+
+      <section id="history" class="view">
+        <article class="card">
+          <div class="section-head"><h2>Lịch sử</h2><span id="historyCount" class="hint"></span></div>
+          <div class="history-tabs" role="tablist">
+            <button type="button" class="history-tab active" data-history="fill">Nhập Fill</button>
+            <button type="button" class="history-tab" data-history="ncc">Nhập Hàng NCC</button>
+            <button type="button" class="history-tab" data-history="adjust">Kiểm kê cabin</button>
+            <button type="button" class="history-tab" data-history="transfer">Chuyển tồn</button>
+          </div>
+          <div class="history-filters">
+            <label>Từ ngày <input id="historyDate" type="date" /></label>
+            <label>Đến ngày <input id="historyToDate" type="date" /></label>
+            <label>Máy <select id="historyMachine"><option value="">Tất cả</option></select></label>
+            <label>Sản phẩm <input id="historyProduct" type="search" placeholder="Tìm sản phẩm" /></label>
+          </div>
+          <div class="history-toolbar">
+            <div class="history-presets" role="group" aria-label="Chọn nhanh khoảng ngày">
+              <button type="button" class="mini" data-history-days="1">Hôm nay</button>
+              <button type="button" class="mini" data-history-days="7">7 ngày</button>
+              <button type="button" class="mini" data-history-days="30">30 ngày</button>
+            </div>
+            <button id="exportHistoryCsvBtn" type="button" class="btn primary hidden">Xuất CSV</button>
+          </div>
+          <div id="historyList"></div>
+        </article>
+      </section>
+
+      <section id="audit" class="view">
+        <article class="card"><h2>Kiểm tra dữ liệu</h2><p class="muted">Phát hiện tồn cabin âm hoặc dữ liệu cần chú ý.</p><div id="auditBox"></div></article>
+        <article class="card">
+          <div class="section-head"><h2>Kiểm kê cabin</h2><span class="hint">Lưu toàn bộ một lượt</span></div>
+          <div class="form-grid two-col">
+            <label>Ngày <input id="stocktakeDate" type="date" required /></label>
+            <label>Máy <select id="stocktakeMachine"></select></label>
+          </div>
+          <p class="muted">Nhập tồn thực tế theo sản phẩm. Hệ thống tự tính chênh lệch.</p>
+          <div id="stocktakeBox"></div>
+        </article>
+      </section>
+
+      <section id="system" class="view">
+        <article class="card management-picker-card">
+          <label>Chức năng quản lý
+            <select id="managementSelect">
+              <option value="account">Tài khoản và phân quyền</option>
+              <option value="layout">Thay đổi layout</option>
+              <option value="sync">Đồng bộ dữ liệu</option>
+              <option value="backup">Sao lưu và khôi phục</option>
+            </select>
+          </label>
+        </article>
+        <article class="card management-panel" data-management-panel="account">
+          <div class="section-head"><h2>Tài khoản</h2><button id="syncAccountBtn" class="btn small" type="button">Mở tài khoản</button></div>
+          <div id="accountOverview" class="account-overview"></div>
+        </article>
+        <article class="card management-panel" data-management-panel="sync">
+          <div class="section-head"><h2>Đồng bộ Supabase</h2><span id="syncStatusPill" class="hint">Local</span></div>
+          <div id="syncOverview" class="sync-overview"></div>
+          <div class="button-row sync-actions"><button id="syncNowBtn" class="btn primary">Đồng bộ ngay</button></div>
+        </article>
+        <article id="syncConfigCard" class="card management-panel hidden" data-management-panel="sync">
+          <h2>Cấu hình Supabase</h2>
+          <form id="syncConfigForm">
+            <label>Project URL <input name="url" type="url" /></label>
+            <label>Publishable key <input name="key" type="text" autocomplete="off" /></label>
+            <button type="submit" class="btn primary">Lưu cấu hình</button>
+          </form>
+        </article>
+        <article class="card management-panel" data-management-panel="backup">
+          <h2>Sao lưu / phục hồi</h2>
+          <p class="muted">Xuất file JSON khi cần lưu một bản dữ liệu riêng.</p>
+          <div class="button-row">
+            <button id="exportBtn" class="btn primary">Xuất dữ liệu JSON</button>
+            <label class="file-btn" data-permission="manage">Nhập dữ liệu JSON<input id="importInput" type="file" accept="application/json" /></label>
+          </div>
+        </article>
+        <article id="memberAdminCard" class="card management-panel hidden" data-management-panel="account">
+          <div class="section-head"><h2>Phân quyền tài khoản</h2><span class="hint">Quản trị viên</span></div>
+          <form id="memberForm">
+            <label>Email tài khoản <input name="email" type="email" autocomplete="off" required /></label>
+            <label>Vai trò
+              <select name="role">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <div class="permission-grid">
+              <label><input name="can_fill" type="checkbox" /> Fill Sản phẩm</label>
+              <label><input name="can_receive" type="checkbox" /> Nhập Hàng NCC</label>
+              <label><input name="can_stocktake" type="checkbox" /> Kiểm kê cabin</label>
+            </div>
+            <button type="submit" class="btn primary">Lưu tài khoản</button>
+          </form>
+          <div id="memberList" class="member-list"></div>
+        </article>
+        <article id="machineAdminCard" class="card management-panel hidden" data-management-panel="layout">
+          <div class="section-head"><h2>Thay đổi layout</h2><span class="hint">Quản trị viên</span></div>
+          <div class="machine-admin-toolbar">
+            <label>Máy <select id="machineEditorSelect"></select></label>
+            <button id="newMachineBtn" type="button" class="btn ghost">+ Máy mới</button>
+          </div>
+          <form id="machineEditorForm">
+            <div class="form-grid two-col machine-basics">
+              <label>Tên máy <input name="name" type="text" required /></label>
+              <div class="slot-count-field"><span>Số lượng slot</span><b id="machineSlotCount">0</b></div>
+            </div>
+            <div class="section-head compact"><h3>Layout slot</h3><button id="addLayoutSlotBtn" type="button" class="btn small ghost">+ Slot</button></div>
+            <div class="layout-table-head" aria-hidden="true"><span>Slot</span><span>Sản phẩm</span><span>Sức chứa</span><span></span></div>
+            <div id="layoutEditorRows" class="layout-editor-rows"></div>
+            <div class="machine-editor-actions">
+              <button id="archiveMachineBtn" type="button" class="btn danger">Lưu trữ máy</button>
+              <button type="submit" class="btn primary">Lưu máy và layout</button>
+            </div>
+          </form>
+          <div class="duplicate-layout-box">
+            <label>Sao chép layout từ <select id="duplicateMachineSource"></select></label>
+            <button id="duplicateLayoutBtn" type="button" class="btn ghost">Sao chép</button>
+          </div>
+        </article>
+        <article class="card danger-zone management-panel" data-management-panel="backup" data-permission="manage"><h2>Reset dữ liệu</h2><p class="muted">Chỉ dùng khi muốn xóa dữ liệu trên thiết bị này.</p><button id="resetBtn" class="btn danger">Reset về dữ liệu gốc</button></article>
+      </section>
+    </main>
+  </div>
+  <div id="authModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-backdrop" data-close-auth></div>
+    <section class="auth-dialog">
+      <div class="section-head"><h2 id="authTitle">Tài khoản</h2><button id="authCloseBtn" class="icon-btn dark" type="button" aria-label="Đóng">&#215;</button></div>
+      <form id="authLoginForm">
+        <label>Email <input name="email" type="email" autocomplete="email" required /></label>
+        <label>Mật khẩu <input name="password" type="password" autocomplete="current-password" required /></label>
+        <button type="submit" class="btn primary">Đăng nhập</button>
+      </form>
+      <div id="authAccountPanel" class="hidden">
+        <div id="authAccountInfo" class="account-overview"></div>
+        <div class="button-row">
+          <button id="authSyncBtn" class="btn primary" type="button">Đồng bộ ngay</button>
+          <button id="authLogoutBtn" class="btn danger" type="button">Đăng xuất</button>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script src="data.js?v=4.2.2"></script>
+  <script src="app.js?v=4.2.2"></script>
+  <script src="v42.js?v=4.2.2"></script>
+</body>
+</html>
