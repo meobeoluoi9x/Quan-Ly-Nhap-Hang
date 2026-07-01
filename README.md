@@ -1,6 +1,6 @@
-# Quản Lý Nhập Hàng V4.2.2
+# Quản Lý Nhập Hàng V4.2.6
 
-V4.2.2 gom Fill Sản phẩm, Nhập Hàng NCC và Tồn cabin vào một mục Vận hành với ba tab. Lịch sử được chia theo ngày và phân trang 30 bản ghi mỗi trang, giúp xem dữ liệu dài mà không phải kéo liên tục. Các quyền tài khoản, bộ lọc ngày và xuất CSV được giữ nguyên.
+V4.2.6 đổi Nhập Hàng NCC sang danh sách sản phẩm của máy: chọn ngày và máy một lần, nhập số thùng rồi lưu cả lượt. Sản phẩm nằm ở nhiều slot chỉ xuất hiện một lần. Tổng thùng và số sản phẩm quy đổi cập nhật ngay khi nhập; bản nháp được giữ riêng theo máy.
 
 Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 
@@ -258,7 +258,7 @@ Thêm tab `Đồng bộ`:
 - Khi online và đã đăng nhập, bấm `Đồng bộ ngay` để đẩy Fill/NCC/Điều chỉnh lên Supabase và tải dữ liệu online về.
 - Khi nhập dữ liệu mới, app tự thử đồng bộ nếu đang online.
 
-File `supabase_schema.sql` đi kèm để tạo bảng và policy trong Supabase.
+File `sql/supabase_schema.sql` đi kèm để tạo bảng và policy trong Supabase.
 
 Lưu ý V3.4.0:
 - Bản này ưu tiên đồng bộ thêm/sửa dữ liệu.
@@ -299,7 +299,7 @@ Day chi la che mat nhe, khong phai bao mat that su. Bao mat chinh van la Supabas
 - Xoa du lieu dung dau xoa de dong bo dung giua nhieu thiet bi.
 - Chuc nang Sao luu giu nguyen, chua dua vao pham vi cai to.
 
-Truoc khi dung dong bo V3.5.1, chay lai `supabase_schema.sql` trong Supabase SQL Editor.
+Truoc khi dung dong bo V3.5.1, chay lai `sql/supabase_schema.sql` trong Supabase SQL Editor.
 
 ## V3.5.1
 
@@ -333,7 +333,7 @@ Truoc khi dung dong bo V3.5.1, chay lai `supabase_schema.sql` trong Supabase SQL
 - Them tab Nguoi dung rieng cho quan tri vien.
 - Moi tai khoan co vai tro Admin hoac User va quyen theo tung chuc nang.
 - Them view `app_users` trong Supabase de xem nhanh danh sach vai tro.
-- Them file `set_admin.sql` de cap quyen Admin truc tiep cho tai khoan chu.
+- Them file `sql/set_admin.sql` de cap quyen Admin truc tiep cho tai khoan chu.
 
 ## V3.7.2 - He thong gon hon
 

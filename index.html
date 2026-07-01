@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Quản Lý Nhập Hàng V4.2.2</title>
-  <link rel="manifest" href="manifest.json?v=4.2.2" />
-  <link rel="stylesheet" href="styles.css?v=4.2.2" />
+  <title>Quản Lý Nhập Hàng V4.2.6</title>
+  <link rel="manifest" href="manifest.json?v=4.2.6" />
+  <link rel="stylesheet" href="styles.css?v=4.2.6" />
 </head>
 <body>
   <div class="app">
@@ -14,7 +14,7 @@
       <button id="menuToggle" class="icon-btn" type="button" aria-label="Mở menu" aria-controls="sideNav" aria-expanded="false">&#9776;</button>
       <div class="app-brand">
         <h1>Quản Lý Nhập Hàng</h1>
-        <p>V4.2.2 - Lịch sử phân trang</p>
+        <p>V4.2.6 - NCC theo sản phẩm</p>
       </div>
       <button id="syncBadge" class="sync-badge" type="button">Local</button>
       <button id="accountBtn" class="account-btn" type="button" aria-label="Tài khoản">Đăng nhập</button>
@@ -93,11 +93,10 @@
         <article class="card">
           <div class="section-head"><h2>Nhập Hàng NCC hàng loạt</h2><span class="hint">Lưu toàn bộ một lượt</span></div>
           <form id="nccForm" class="bulk-receive-form">
-            <div class="bulk-receive-toolbar">
+            <div class="form-grid two-col">
               <label>Ngày <input name="date" type="date" required /></label>
-              <button id="addNccRowBtn" type="button" class="btn ghost">+ Thêm dòng</button>
+              <label>Máy <select id="nccMachine"></select></label>
             </div>
-            <div class="bulk-table-head" aria-hidden="true"><span>Máy</span><span>Sản phẩm</span><span>Thùng</span><span>Xóa</span></div>
             <div id="bulkNccRows" class="bulk-ncc-rows"></div>
             <div id="nccBatchPreview" class="batch-preview"></div>
             <div class="button-row bulk-actions">
@@ -287,8 +286,8 @@
       </div>
     </section>
   </div>
-  <script src="data.js?v=4.2.2"></script>
-  <script src="app.js?v=4.2.2"></script>
-  <script src="v42.js?v=4.2.2"></script>
+  <script src="data.js?v=4.2.6"></script>
+  <script src="app.js?v=4.2.6"></script>
+  <script src="v42.js?v=4.2.6"></script>
 </body>
 </html>

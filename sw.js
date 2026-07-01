@@ -1,4 +1,4 @@
-const CACHE = "quan-ly-nhap-hang-v4-2-2";
+const CACHE = "quan-ly-nhap-hang-v4-2-6";
 const ASSETS = ["./","./index.html","./styles.css","./data.js","./app.js","./v42.js","./manifest.json","./icon-192.png","./icon-512.png"];
 
 self.addEventListener("install", event => {

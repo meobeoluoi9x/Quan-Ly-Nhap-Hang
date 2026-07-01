@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.2.2 */
+/* Quản Lý Nhập Hàng V4.2.6 */
 const V42_FILL_DRAFT = "qlnh_fill_draft_v42";
 const V42_NCC_DRAFT = "qlnh_ncc_draft_v42";
 const V42_MANAGEMENT = "qlnh_management_v42";
@@ -119,47 +119,68 @@ function saveQuickFillBatch() {
   showToast(`Đã lưu ${entries.length} slot Fill Sản phẩm.`);
 }
 
-function addNccRow(values = {}) {
+function nccProductsForMachine(machine) {
+  return unique(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product))
+    .sort((a, b) => a.localeCompare(b, "vi"));
+}
+
+function renderNccProductList() {
   const box = $("#bulkNccRows");
-  if (!box) return;
-  const row = document.createElement("div");
-  row.className = "bulk-ncc-row";
-  row.innerHTML = `
-    <select class="bulk-machine" aria-label="Máy">${machineOptionsHtml(values.machine)}</select>
-    <select class="bulk-product" aria-label="Sản phẩm">${allProducts().map(product => `<option ${product === values.product ? "selected" : ""}>${htmlEscape(product)}</option>`).join("")}</select>
-    <div class="bulk-box-control"><input class="bulk-boxes" type="number" min="0" step="1" inputmode="numeric" placeholder="Thùng" value="${values.boxes || ""}" /><small class="bulk-conversion"></small></div>
-    <button type="button" class="remove-row-btn" data-remove-ncc-row tabindex="-1" aria-label="Xóa dòng">×</button>`;
-  box.appendChild(row);
+  const machine = $("#nccMachine")?.value;
+  if (!box || !machine) return;
+  const draft = readV42Draft(V42_NCC_DRAFT) || {};
+  const values = draft.machines?.[machine] || {};
+  const products = nccProductsForMachine(machine);
+  box.innerHTML = products.length ? products.map((product, index) => `
+    <div class="bulk-ncc-row ncc-product-card" data-machine="${htmlEscape(machine)}" data-product="${htmlEscape(product)}">
+      <div class="ncc-product-info"><b>${htmlEscape(product)}</b><span>1 thùng = ${productInfo(product).pack} sản phẩm</span></div>
+      <div class="bulk-box-control"><input class="bulk-boxes" type="number" min="0" step="1" inputmode="numeric" placeholder="Số thùng" value="${htmlEscape(values[product] || "")}" data-step="${index}" aria-label="Số thùng ${htmlEscape(product)}" /><small class="bulk-conversion"></small></div>
+      <button type="button" class="clear-ncc-row" data-clear-ncc tabindex="-1" aria-label="Xóa số thùng ${htmlEscape(product)}">×</button>
+    </div>`).join("") : `<p class="muted">Máy này chưa có sản phẩm trong layout.</p>`;
+  const savedStep = Number(draft.steps?.[machine] || 0);
+  v42NccStep = Math.min(savedStep, Math.max(0, products.length - 1));
+  setNccStep(v42NccStep);
   updateNccBatchPreview();
-  setNccStep($$(".bulk-ncc-row", box).length - 1);
 }
 
 function updateNccBatchPreview() {
-  const rows = mergedNccBatchRows();
+  const rows = nccDraftRows().map(item => ({ ...item, boxes: Number(item.boxes || 0) })).filter(item => item.boxes > 0);
   const boxes = rows.reduce((sum, item) => sum + item.boxes, 0);
   const products = rows.reduce((sum, item) => sum + item.boxes * productInfo(item.product).pack, 0);
-  $$(".bulk-ncc-row", $("#bulkNccRows")).forEach(row => {
+  $$(".ncc-product-card", $("#bulkNccRows")).forEach(row => {
     const qty = Number($(".bulk-boxes", row).value || 0);
-    const product = $(".bulk-product", row).value;
+    const product = row.dataset.product;
     if ($(".bulk-conversion", row)) $(".bulk-conversion", row).textContent = `${qty * productInfo(product).pack} sản phẩm`;
   });
   if ($("#nccBatchPreview")) $("#nccBatchPreview").innerHTML = `
-    <div><span>Dòng sau gộp</span><b>${rows.length}</b></div>
+    <div><span>Sản phẩm đã nhập</span><b>${rows.length}</b></div>
     <div><span>Tổng thùng</span><b>${boxes}</b></div>
     <div><span>Quy đổi</span><b>${products} sản phẩm</b></div>`;
 }
 
 function nccDraftRows() {
-  return $$(".bulk-ncc-row", $("#bulkNccRows")).map(row => ({
-    machine: $(".bulk-machine", row).value,
-    product: $(".bulk-product", row).value,
+  return $$(".ncc-product-card", $("#bulkNccRows")).map(row => ({
+    machine: row.dataset.machine,
+    product: row.dataset.product,
     boxes: $(".bulk-boxes", row).value
   }));
 }
 
 function persistNccDraft() {
   const form = $("#nccForm");
-  if (form) localStorage.setItem(V42_NCC_DRAFT, JSON.stringify({ date: form.date.value, rows: nccDraftRows(), step: v42NccStep }));
+  if (!form) return;
+  const draft = readV42Draft(V42_NCC_DRAFT) || { machines: {}, steps: {} };
+  draft.machines ||= {};
+  draft.steps ||= {};
+  const rows = nccDraftRows();
+  const rowMachine = rows[0]?.machine;
+  if (rowMachine) {
+    draft.machines[rowMachine] = Object.fromEntries(rows.map(item => [item.product, item.boxes]));
+    draft.steps[rowMachine] = v42NccStep;
+  }
+  draft.date = form.date.value;
+  draft.activeMachine = $("#nccMachine")?.value || rowMachine || "";
+  localStorage.setItem(V42_NCC_DRAFT, JSON.stringify(draft));
 }
 
 function ensureNccStepNav() {
@@ -190,19 +211,24 @@ function resetNccBatch(clearDraft = false) {
   if (clearDraft) localStorage.removeItem(V42_NCC_DRAFT);
   const draft = clearDraft ? null : readV42Draft(V42_NCC_DRAFT);
   form.date.value = draft?.date || todayISO();
-  box.innerHTML = "";
-  (draft?.rows?.length ? draft.rows : [{}]).forEach(addNccRow);
+  const machine = $("#nccMachine");
+  machine.innerHTML = machineOptionsHtml(draft?.activeMachine || activeDashboardMachine || "");
   ensureNccStepNav();
-  v42NccStep = Number(draft?.step || 0);
-  setNccStep(v42NccStep);
-  updateNccBatchPreview();
+  renderNccProductList();
 }
 
 function saveNccBatch(form) {
   if (!requirePermission("receive")) return;
-  const rows = nccDraftRows().map(item => ({ ...item, boxes: Number(item.boxes || 0) })).filter(item => item.boxes > 0);
-  if (!rows.length) return showToast("Chưa nhập số thùng NCC.");
-  if (rows.some(item => !Number.isInteger(item.boxes))) return showToast("Số thùng phải là số nguyên.");
+  const entries = nccDraftRows().map(item => ({ ...item, boxes: Number(item.boxes || 0) })).filter(item => item.boxes > 0);
+  if (!entries.length) return showToast("Chưa nhập số thùng NCC.");
+  if (entries.some(item => !Number.isInteger(item.boxes))) return showToast("Số thùng phải là số nguyên.");
+  const merged = new Map();
+  entries.forEach(item => {
+    const key = `${item.machine}||${item.product}`;
+    if (!merged.has(key)) merged.set(key, { machine: item.machine, product: item.product, boxes: 0 });
+    merged.get(key).boxes += item.boxes;
+  });
+  const rows = [...merged.values()];
   const batchId = makeId();
   const recordedAt = new Date().toISOString();
   const date = form.date.value || todayISO();
@@ -213,7 +239,7 @@ function saveNccBatch(form) {
   localStorage.removeItem(V42_NCC_DRAFT);
   saveState();
   resetNccBatch(true);
-  showToast(`Đã lưu ${rows.length} dòng Nhập Hàng NCC.`);
+  showToast(`Đã lưu ${rows.length} sản phẩm NCC.`);
 }
 
 function stocktakeItems(machine) {
@@ -632,12 +658,21 @@ function renderAll() {
 }
 
 function setupV42() {
-  if ($(".app-header p")) $(".app-header p").textContent = "V4.2.2 - Lịch sử phân trang";
+  if ($(".app-header p")) $(".app-header p").textContent = "V4.2.6 - NCC theo sản phẩm";
   $("#quickDate")?.addEventListener("change", persistQuickDraft);
   $$(".operation-tab").forEach(button => button.addEventListener("click", () => activateView(button.dataset.operationView)));
 
-  $("#bulkNccRows")?.addEventListener("input", persistNccDraft);
-  $("#bulkNccRows")?.addEventListener("change", persistNccDraft);
+  const refreshNccDraft = event => {
+    if (!event.target.matches(".bulk-boxes")) return;
+    updateNccBatchPreview();
+    persistNccDraft();
+  };
+  $("#bulkNccRows")?.addEventListener("input", refreshNccDraft);
+  $("#bulkNccRows")?.addEventListener("change", refreshNccDraft);
+  $("#nccMachine")?.addEventListener("change", () => {
+    persistNccDraft();
+    renderNccProductList();
+  });
   $("#bulkNccRows")?.addEventListener("keydown", event => {
     if (!event.target.matches(".bulk-boxes") || event.key !== "Tab") return;
     event.preventDefault();
@@ -645,12 +680,16 @@ function setupV42() {
     const index = inputs.indexOf(event.target);
     const next = event.shiftKey ? inputs[index - 1] : inputs[index + 1];
     if (next) next.focus();
-    else (event.shiftKey ? $("#addNccRowBtn") : $("#saveNccBatchBtn"))?.focus();
+    else (event.shiftKey ? $("#nccMachine") : $("#saveNccBatchBtn"))?.focus();
   });
   $("#resetNccBatchBtn")?.addEventListener("click", () => resetNccBatch(true));
   $("#bulkNccRows")?.addEventListener("click", event => {
-    if (!event.target.closest("[data-remove-ncc-row]")) return;
-    setNccStep(Math.min(v42NccStep, $$(".bulk-ncc-row", $("#bulkNccRows")).length - 1));
+    const clear = event.target.closest("[data-clear-ncc]");
+    if (!clear) return;
+    const card = clear.closest(".ncc-product-card");
+    $(".bulk-boxes", card).value = "";
+    updateNccBatchPreview();
+    persistNccDraft();
   });
 
   $("#stocktakeBox")?.addEventListener("input", updateStocktakePreview);

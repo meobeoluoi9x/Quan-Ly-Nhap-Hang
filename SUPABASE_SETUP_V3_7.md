@@ -3,8 +3,8 @@
 ## Chuyen tu ban 3.6.0
 
 1. Vao **Supabase > Authentication > Users** va tao tai khoan quan tri bang email, mat khau.
-2. Vao **SQL Editor**, mo file `supabase_schema.sql`, dan toan bo noi dung roi bam **Run**.
-3. Chay them file `set_admin.sql` de cap Admin cho tai khoan chu.
+2. Vao **SQL Editor**, mo file `sql/supabase_schema.sql`, dan toan bo noi dung roi bam **Run**.
+3. Chay them file `sql/set_admin.sql` de cap Admin cho tai khoan chu.
 4. Mở Quản Lý Nhập Hàng bằng `index.html?v=4.0.0`, bấm **Đăng nhập** ở góc phải.
 5. Dang nhap tai khoan quan tri. Tai khoan nay se nhan toan bo du lieu cu va co du quyen.
 6. Cho huy hieu bao **Da dong bo**, sau do kiem tra lich su Fill, Nhap hang va Kiem ke.
