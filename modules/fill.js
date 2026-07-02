@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.4.0 - fill.js */
+/* Quản Lý Nhập Hàng V4.4.2 - fill.js */
 function persistQuickDraft() {
   const cards = $$(".slot-card", $("#quickFillBox"));
   if (!cards.length) return;

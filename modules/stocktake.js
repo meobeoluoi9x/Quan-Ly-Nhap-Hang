@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.4.0 - stocktake.js */
+/* Quản Lý Nhập Hàng V4.4.2 - stocktake.js */
 function stocktakeItems(machine) {
   const cabin = displayCabin();
   const products = new Set(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product));

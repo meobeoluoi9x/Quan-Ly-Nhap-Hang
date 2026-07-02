@@ -1,4 +1,4 @@
-const APP_VERSION = "4.4.0";
+const APP_VERSION = "4.4.2";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -150,9 +150,8 @@ function suggestOrder(qty, product) {
     return info.pack * 3;
   }
 
-  // Sản phẩm thường chỉ đặt tối đa một thùng khi tồn từ 12 trở xuống.
-  if (stock > 12) return 0;
-  return info.pack;
+  // Sản phẩm thường chỉ đặt một thùng khi tồn còn tối đa 6 sản phẩm.
+  return stock <= 6 ? info.pack : 0;
 }
 
 function displayCabin() {
@@ -1890,10 +1889,12 @@ function expectedDemandBeforeNextVisit(machine, product) {
 function suggestedOrderForLayout(stock, product, layout, projected) {
   const pack = productInfo(product).pack;
   if (isAquaProduct(product)) return suggestOrder(projected, product);
+  if (projected > 6) return 0;
   if (layout.slotCount > 1 && layout.capacity > pack) {
-    return projected <= layout.capacity - pack ? pack : 0;
+    const shortage = Math.max(pack, layout.capacity - Math.max(0, projected));
+    return Math.ceil(shortage / pack) * pack;
   }
-  return projected <= 12 ? pack : 0;
+  return pack;
 }
 
 function buildOrderRows() {

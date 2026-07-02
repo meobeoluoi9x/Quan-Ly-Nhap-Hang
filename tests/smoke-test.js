@@ -39,10 +39,13 @@ assert.equal(context.suggestOrder(56, "Aqua"), 0);
 assert.equal(context.suggestOrder(28, "Aqua"), 28);
 assert.equal(context.suggestOrder(1, "Aqua"), 56);
 assert.equal(context.suggestOrder(0, "Aqua"), 84);
+assert.equal(context.suggestOrder(6, "Pepsi chanh"), 24);
+assert.equal(context.suggestOrder(7, "Pepsi chanh"), 0);
 
 const twoSlots = { slotCount: 2, capacity: 40 };
-assert.equal(context.suggestedOrderForLayout(16, "Pepsi chanh", twoSlots, 16), 24);
-assert.equal(context.suggestedOrderForLayout(17, "Pepsi chanh", twoSlots, 17), 0);
+assert.equal(context.suggestedOrderForLayout(0, "Pepsi chanh", twoSlots, 0), 48);
+assert.equal(context.suggestedOrderForLayout(6, "Pepsi chanh", twoSlots, 6), 48);
+assert.equal(context.suggestedOrderForLayout(7, "Pepsi chanh", twoSlots, 7), 0);
 
 const normalized = context.normalizeState({ fillLogs: null, nccLogs: {}, adjustLogs: [] });
 assert.ok(Array.isArray(normalized.fillLogs));
@@ -56,9 +59,9 @@ assert.equal(context.csvCell(-5), `"-5"`);
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
 assert.equal(new Set(ids).size, ids.length, "index.html contains duplicate ids");
-assert.match(html, /Quản Lý Nhập Hàng V4\.4\.0/);
-assert.match(html, /app\.js\?v=4\.4\.0/);
-runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=4\\.4\\.0`)));
+assert.match(html, /Quản Lý Nhập Hàng V4\.4\.2/);
+assert.match(html, /app\.js\?v=4\.4\.2/);
+runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=4\\.4\\.2`)));
 assert.match(html, /id="nccMachine"/);
 assert.equal((html.match(/data-operation-view=/g) || []).length, 9);
 assert.match(html, /class="tab operation-menu-tab" data-view="operations"/);
@@ -83,11 +86,11 @@ assert.match(stylesSource, /\.ncc-product-card\{display:grid;grid-template-colum
 assert.doesNotMatch(v42Source, /data-add-boxes|data-val=/);
 
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
-assert.equal(manifest.name, "Quản Lý Nhập Hàng V4.4.0");
+assert.equal(manifest.name, "Quản Lý Nhập Hàng V4.4.2");
 const serviceWorker = fs.readFileSync(path.join(root, "sw.js"), "utf8");
-assert.match(serviceWorker, /quan-ly-nhap-hang-v4-4-0/);
+assert.match(serviceWorker, /quan-ly-nhap-hang-v4-4-2/);
 runtimeModules.forEach(name => assert.match(serviceWorker, new RegExp(`\\./modules/${name.replace(".", "\\.")}`)));
 assert.doesNotMatch(extractLastFunction("renderHistoryV4Runtime"), /onclick=/);
 assert.doesNotMatch(extractLastFunction("renderAudit"), /onclick=/);
 
-console.log("V4.4.0 smoke tests: PASS");
+console.log("V4.4.2 smoke tests: PASS");

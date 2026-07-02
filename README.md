@@ -1,6 +1,6 @@
-# Quản Lý Nhập Hàng V4.4.0
+# Quản Lý Nhập Hàng V4.4.2
 
-V4.4.0 dọn 60 thân hàm cũ bị ghi đè trong `app.js` và chia runtime thành các module theo nghiệp vụ: Fill, NCC, kiểm kê, chuyển tồn, lịch sử và UI. Cấu trúc dữ liệu, quyền và đồng bộ Supabase được giữ nguyên.
+V4.4.2 giữ ngưỡng đặt hàng của sản phẩm thường ở mức tồn 0 đến 6. Sản phẩm một slot đặt 1 thùng; sản phẩm nhiều slot đặt đủ số thùng nguyên để bù tới tổng sức chứa. Tồn từ 7 trở lên không đặt và Aqua giữ công thức riêng.
 
 Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 
