@@ -1,5 +1,10 @@
-const CACHE = "quan-ly-nhap-hang-v4-2-6";
-const ASSETS = ["./","./index.html","./styles.css","./data.js","./app.js","./v42.js","./manifest.json","./icon-192.png","./icon-512.png"];
+const CACHE = "quan-ly-nhap-hang-v4-4-0";
+const ASSETS = [
+  "./", "./index.html", "./styles.css", "./data.js", "./app.js", "./manifest.json",
+  "./modules/runtime-core.js", "./modules/fill.js", "./modules/ncc.js", "./modules/stocktake.js",
+  "./modules/transfer.js", "./modules/history.js", "./modules/ui.js", "./modules/bootstrap.js",
+  "./icon-192.png", "./icon-512.png"
+];
 
 self.addEventListener("install", event => {
   self.skipWaiting();

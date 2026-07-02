@@ -351,7 +351,7 @@ main{max-width:1120px;padding:14px}
   .cabin-summary{grid-template-columns:1fr 1fr 1fr}
 }
 
-/* V4.2.6 */
+/* V4.4.0 */
 .operation-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 0 12px;padding:4px;border:1px solid #cbd5e1;border-radius:8px;background:#e2e8f0}
 .operation-tab{min-height:42px;padding:9px 10px;border-radius:6px;background:transparent;color:#334155;font-size:13px}
 .operation-tab.active{background:#0f172a;color:white}
@@ -397,9 +397,9 @@ main{max-width:1120px;padding:14px}
   .mobile-step-nav{display:grid;grid-template-columns:1fr 64px 1fr;align-items:center;gap:8px;margin:10px 0}
   .mobile-step-nav b{text-align:center;font-variant-numeric:tabular-nums}
   .mobile-step-nav .btn{width:100%;padding:10px}
-  .quick-fill-list .slot-card,.bulk-ncc-row{display:none}
+  .quick-fill-list .slot-card{display:none}
   .quick-fill-list .slot-card.mobile-active{display:grid}
-  .ncc-product-card.mobile-active{display:grid;grid-template-columns:minmax(0,1fr) 38px;gap:8px;padding:12px}
+  .ncc-product-card{display:grid;grid-template-columns:minmax(0,1fr) 38px;gap:8px;padding:12px}
   .ncc-product-card .ncc-product-info{grid-column:1/-1;padding-right:34px}
   .ncc-product-card .bulk-box-control{grid-column:1}
   .ncc-product-card .clear-ncc-row{grid-column:2;grid-row:2}

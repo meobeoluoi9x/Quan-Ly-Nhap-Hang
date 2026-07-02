@@ -1,8 +1,17 @@
-# Quản Lý Nhập Hàng V4.2.6
+# Quản Lý Nhập Hàng V4.4.0
 
-V4.2.6 đổi Nhập Hàng NCC sang danh sách sản phẩm của máy: chọn ngày và máy một lần, nhập số thùng rồi lưu cả lượt. Sản phẩm nằm ở nhiều slot chỉ xuất hiện một lần. Tổng thùng và số sản phẩm quy đổi cập nhật ngay khi nhập; bản nháp được giữ riêng theo máy.
+V4.4.0 dọn 60 thân hàm cũ bị ghi đè trong `app.js` và chia runtime thành các module theo nghiệp vụ: Fill, NCC, kiểm kê, chuyển tồn, lịch sử và UI. Cấu trúc dữ liệu, quyền và đồng bộ Supabase được giữ nguyên.
 
 Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
+
+## Cấu trúc runtime
+
+- `app.js`: dữ liệu lõi, dashboard, đồng bộ và phân quyền.
+- `modules/fill.js`, `modules/ncc.js`: nhập Fill và nhập hàng NCC.
+- `modules/stocktake.js`, `modules/transfer.js`: kiểm kê và chuyển tồn.
+- `modules/history.js`, `modules/ui.js`: lịch sử và điều hướng giao diện.
+- `modules/bootstrap.js`: gắn sự kiện và khởi tạo runtime.
+- `sql/`: schema và các script cấu hình Supabase.
 
 ## Có gì trong bản này
 
