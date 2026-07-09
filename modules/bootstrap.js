@@ -1,6 +1,6 @@
-/* Quản Lý Nhập Hàng V4.4.2 - bootstrap.js */
+/* Quản Lý Nhập Hàng V4.4.3 - bootstrap.js */
 function setupV42() {
-  if ($(".app-header p")) $(".app-header p").textContent = "V4.4.2 - Đủ hàng nhiều slot";
+  if ($(".app-header p")) $(".app-header p").textContent = "V4.4.3 - Đủ hàng nhiều slot";
   $("#quickDate")?.addEventListener("change", persistQuickDraft);
   $("#quickMachine")?.addEventListener("change", renderQuickFill);
   $$(".operation-tab").forEach(button => button.addEventListener("click", () => activateView(button.dataset.operationView)));
@@ -120,3 +120,4 @@ function setupV42() {
 }
 
 setupV42();
+

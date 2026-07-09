@@ -27,3 +27,4 @@ Khong tat hay xoa du lieu cu truoc khi hoan thanh buoc 4. File SQL tu khoa quyen
 - Tat ca thanh vien duoc xem du lieu chung cua workspace.
 
 Chi dung `Publishable key` trong ma nguon. Khong dua `Secret key` hoac `service_role` vao ung dung.
+

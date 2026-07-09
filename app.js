@@ -1,4 +1,4 @@
-const APP_VERSION = "4.4.2";
+const APP_VERSION = "4.4.3";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -1333,7 +1333,7 @@ function renderStocktake() {
     <div class="stocktake-list">${items.map(item => `
       <label class="stocktake-row" data-product="${htmlEscape(item.product)}" data-current="${item.qty}">
         <span><b>${htmlEscape(item.product)}</b><small>Hiện tại: ${item.qty} sản phẩm</small></span>
-        <input type="number" min="0" step="1" inputmode="numeric" value="${item.qty}" />
+        <input type="number" step="1" inputmode="numeric" value="${item.qty}" />
       </label>`).join("")}</div>
     <div class="stocktake-actions"><button id="resetStocktakeBtn" type="button" class="btn ghost">Nhập lại</button><button id="saveStocktakeBtn" type="button" class="btn primary">Lưu kiểm kê</button></div>
   ` : `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
@@ -1351,8 +1351,8 @@ function saveStocktakeBatch() {
     const actual = Number(raw);
     return { product: row.dataset.product, current, actual, diff: actual - current };
   });
-  if (entries.some(item => !Number.isInteger(item.actual) || item.actual < 0)) {
-    return showToast("Tồn kiểm kê phải là số nguyên từ 0 trở lên.");
+  if (entries.some(item => !Number.isInteger(item.actual))) {
+    return showToast("Tồn kiểm kê phải là số nguyên.");
   }
   const changes = entries.filter(item => item.diff !== 0);
   if (!changes.length) return showToast("Không có chênh lệch để lưu.");
@@ -2432,3 +2432,4 @@ seedMachineConfig();
 refreshOperationalSelects();
 renderMachineManager();
 renderAll();
+

@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.4.2 - history.js */
+/* Quản Lý Nhập Hàng V4.4.3 - history.js */
 function isTransferRecord(item) {
   return String(item.reason || "").startsWith("Chuyển tồn:");
 }
@@ -94,7 +94,7 @@ function renderHistoryV4Runtime() {
     const amount = activeHistoryType === "ncc" ? `${nccBoxes(item)} thùng · ${item.qty} sản phẩm`
       : activeHistoryType === "adjust" ? `${Number(item.actual) - Number(item.qty)} → ${item.actual} (${item.qty > 0 ? "+" : ""}${item.qty})`
       : `${item.qty} sản phẩm`;
-    const detail = activeHistoryType === "fill" ? `Slot ${item.slot} · ${htmlEscape(item.product)}` : htmlEscape(item.product);
+    const detail = activeHistoryType === "fill" && item.slot ? `Slot ${item.slot} · ${htmlEscape(item.product)}` : htmlEscape(item.product);
     const actions = hasPermission(permission) ? `<div class="actions">${activeHistoryType === "adjust" ? "" : `<button class="mini" onclick="edit${type}('${item.id}')">Sửa</button>`}<button class="mini danger" onclick="delete${type}('${item.id}')">Xóa</button></div>` : "";
     return `<div class="history-row"><div><b>${historyDateTime(item)} · ${htmlEscape(item.machine)}</b><span>${detail}</span></div><strong>${amount}</strong>${actions}</div>`;
   }).join("")}</section>`).join("") + historyPaginationHtml(rows.length) || `<p class="muted">Chưa có lịch sử phù hợp.</p>`;
@@ -129,8 +129,10 @@ function exportHistoryCsv() {
   const header = activeHistoryType === "fill" ? ["Ngày giờ", "Máy", "Slot", "Sản phẩm", "Số lượng"]
     : activeHistoryType === "ncc" ? ["Ngày giờ", "Máy", "Sản phẩm", "Thùng", "Quy đổi sản phẩm"]
     : ["Ngày giờ", "Máy", "Sản phẩm", "Tồn cũ", "Tồn thực tế", "Chênh lệch"];
-  const body = rows.map(item => activeHistoryType === "fill" ? [historyDateTime(item), item.machine, item.slot, item.product, item.qty]
+  const body = rows.map(item => activeHistoryType === "fill" ? [historyDateTime(item), item.machine, item.slot || "", item.product, item.qty]
     : activeHistoryType === "ncc" ? [historyDateTime(item), item.machine, item.product, nccBoxes(item), item.qty]
     : [historyDateTime(item), item.machine, item.product, Number(item.actual) - Number(item.qty), item.actual, item.qty]);
   downloadCsvFile([header, ...body], `lich-su-${activeHistoryType}-${todayISO()}.csv`);
 }
+
+

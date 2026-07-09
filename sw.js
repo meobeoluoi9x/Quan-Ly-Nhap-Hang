@@ -1,4 +1,4 @@
-const CACHE = "quan-ly-nhap-hang-v4-4-2";
+const CACHE = "quan-ly-nhap-hang-v4-4-3";
 const ASSETS = [
   "./", "./index.html", "./styles.css", "./data.js", "./app.js", "./manifest.json",
   "./modules/runtime-core.js", "./modules/fill.js", "./modules/ncc.js", "./modules/stocktake.js",
@@ -34,3 +34,4 @@ self.addEventListener("fetch", event => {
   }
   event.respondWith(caches.match(event.request).then(response => response || fetch(event.request)));
 });
+

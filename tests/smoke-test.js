@@ -59,9 +59,9 @@ assert.equal(context.csvCell(-5), `"-5"`);
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
 assert.equal(new Set(ids).size, ids.length, "index.html contains duplicate ids");
-assert.match(html, /Quản Lý Nhập Hàng V4\.4\.2/);
-assert.match(html, /app\.js\?v=4\.4\.2/);
-runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=4\\.4\\.2`)));
+assert.match(html, /Quản Lý Nhập Hàng V4\.4\.3/);
+assert.match(html, /app\.js\?v=4\.4\.3/);
+runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=4\\.4\\.3`)));
 assert.match(html, /id="nccMachine"/);
 assert.equal((html.match(/data-operation-view=/g) || []).length, 9);
 assert.match(html, /class="tab operation-menu-tab" data-view="operations"/);
@@ -71,7 +71,12 @@ assert.match(v42Source, /V42_HISTORY_PAGE_SIZE = 30/);
 assert.match(v42Source, /data-history-page="prev"/);
 assert.match(v42Source, /function renderNccProductList\(/);
 assert.match(v42Source, /function nccProductsForMachine\(/);
+assert.match(v42Source, /function quickFillProductsForMachine\(/);
 assert.match(v42Source, /unique\(config\(\)\.slots\.filter\(slot => slot\.machine === machine\)\.map\(slot => slot\.product\)\)/);
+assert.match(v42Source, /data-product="\$\{htmlEscape\(product\)\}"/);
+assert.doesNotMatch(v42Source, /data-slot="\$\{Number\(slot\.slot\)\}"/);
+assert.match(v42Source, /Tồn thực tế phải là số nguyên/);
+assert.doesNotMatch(v42Source, /item\.actual < 0/);
 assert.match(v42Source, /Đã lưu \$\{rows\.length\} sản phẩm NCC/);
 assert.match(v42Source, /const refreshNccDraft = event => \{/);
 assert.match(v42Source, /function scheduleNccDraft\(\)/);
@@ -86,11 +91,12 @@ assert.match(stylesSource, /\.ncc-product-card\{display:grid;grid-template-colum
 assert.doesNotMatch(v42Source, /data-add-boxes|data-val=/);
 
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
-assert.equal(manifest.name, "Quản Lý Nhập Hàng V4.4.2");
+assert.equal(manifest.name, "Quản Lý Nhập Hàng V4.4.3");
 const serviceWorker = fs.readFileSync(path.join(root, "sw.js"), "utf8");
-assert.match(serviceWorker, /quan-ly-nhap-hang-v4-4-2/);
+assert.match(serviceWorker, /quan-ly-nhap-hang-v4-4-3/);
 runtimeModules.forEach(name => assert.match(serviceWorker, new RegExp(`\\./modules/${name.replace(".", "\\.")}`)));
 assert.doesNotMatch(extractLastFunction("renderHistoryV4Runtime"), /onclick=/);
 assert.doesNotMatch(extractLastFunction("renderAudit"), /onclick=/);
 
-console.log("V4.4.2 smoke tests: PASS");
+console.log("V4.4.3 smoke tests: PASS");
+
