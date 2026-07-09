@@ -1,4 +1,4 @@
-const APP_VERSION = "4.4.3";
+const APP_VERSION = "4.4.4";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -494,12 +494,7 @@ function renderQuickFill() {
             <span>${htmlEscape(slot.product)}${slot.max ? ` · Max ${Number(slot.max)}` : ""}</span>
           </div>
           <div class="slot-controls compact embedded">
-            <div class="quick-qty-control">
-              <input type="number" min="0" step="1" inputmode="numeric" placeholder="0" />
-              <div class="slot-actions inline">
-                ${[1,2,3,5].map(n => `<button type="button" data-val="${n}">+${n}</button>`).join("")}
-              </div>
-            </div>
+            <input type="number" min="0" step="1" inputmode="numeric" placeholder="0" />
             <button type="button" class="clear-slot" data-clear="1">Xóa</button>
           </div>
         </div>
@@ -681,7 +676,6 @@ function addNccRow(values = {}) {
     <select class="bulk-product" aria-label="Sản phẩm">${productOptionsHtml(values.product || "")}</select>
     <div class="bulk-box-control">
       <input class="bulk-boxes" type="number" min="0" step="1" inputmode="numeric" value="${Number(values.boxes || 0) || ""}" aria-label="Số thùng" />
-      ${[1, 2, 3, 5].map(value => `<button type="button" class="quick-btn" data-add-boxes="${value}">+${value}</button>`).join("")}
     </div>
     <button type="button" class="remove-row-btn" data-remove-ncc-row aria-label="Xóa dòng">×</button>`;
   box.appendChild(row);
@@ -1261,7 +1255,7 @@ function updateNccConversion() {
 
 function setupQuickPads() {
   $$(".quickPad").forEach(pad => {
-    pad.innerHTML = [1, 2, 3, 5].map(n => `<button type="button" class="quick-btn" data-val="${n}">+${n}</button>`).join("");
+    pad.innerHTML = "";
     pad.addEventListener("click", event => {
       const button = event.target.closest("button");
       if (!button) return;

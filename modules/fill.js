@@ -1,7 +1,15 @@
-/* Quản Lý Nhập Hàng V4.4.3 - fill.js */
+/* Quản Lý Nhập Hàng V4.4.4 - fill.js */
 function quickFillProductsForMachine(machine) {
   return unique(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product))
     .sort((a, b) => a.localeCompare(b, "vi"));
+}
+
+function quickFillProductLayout(machine, product) {
+  const slots = config().slots.filter(slot => slot.machine === machine && slot.product === product);
+  return {
+    slotCount: slots.length,
+    capacity: slots.reduce((sum, slot) => sum + Number(slot.max || 0), 0)
+  };
 }
 
 function persistQuickDraft() {
@@ -45,7 +53,7 @@ function renderQuickFill() {
   v42FillStep = draft?.machine === machine ? Number(draft.step || 0) : 0;
   box.innerHTML = `
     <div class="quick-fill-list">${products.map((product, index) => {
-      const layout = productLayout(machine, product);
+      const layout = quickFillProductLayout(machine, product);
       const layoutText = layout.slotCount > 1 ? `${layout.slotCount} slot · Max ${layout.capacity || 0}` : `Max ${layout.capacity || 0}`;
       return `
       <div class="slot-card quick-product-card" data-machine="${htmlEscape(machine)}" data-product="${htmlEscape(product)}">

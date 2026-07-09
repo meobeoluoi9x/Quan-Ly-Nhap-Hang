@@ -1,6 +1,6 @@
-# Quản Lý Nhập Hàng V4.4.3
+# Quản Lý Nhập Hàng V4.4.4
 
-V4.4.3 giữ ngưỡng đặt hàng của sản phẩm thường ở mức tồn 0 đến 6. Sản phẩm một slot đặt 1 thùng; sản phẩm nhiều slot đặt đủ số thùng nguyên để bù tới tổng sức chứa. Tồn từ 7 trở lên không đặt và Aqua giữ công thức riêng.
+V4.4.4 giữ ngưỡng đặt hàng của sản phẩm thường ở mức tồn 0 đến 6. Sản phẩm một slot đặt 1 thùng; sản phẩm nhiều slot đặt đủ số thùng nguyên để bù tới tổng sức chứa. Tồn từ 7 trở lên không đặt và Aqua giữ công thức riêng.
 
 Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 
