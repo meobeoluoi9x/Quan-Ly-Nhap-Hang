@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.5.0 - ncc.js */
+﻿/* Quản Lý Nhập Hàng V5.2.0 - ncc.js */
 function nccProductsForMachine(machine) {
   return unique(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product))
     .sort((a, b) => a.localeCompare(b, "vi"));
@@ -107,4 +107,5 @@ function saveNccBatch(form) {
   resetNccBatch(true);
   showToast(`Đã lưu ${rows.length} sản phẩm NCC.`);
 }
+
 

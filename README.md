@@ -1,12 +1,14 @@
-# Quản Lý Nhập Hàng V4.5.0
+﻿# Quản Lý Nhập Hàng V5.2.0
 
-V4.5.0 giữ ngưỡng đặt hàng của sản phẩm thường ở mức tồn 0 đến 6. Sản phẩm một slot đặt 1 thùng; sản phẩm nhiều slot đặt đủ số thùng nguyên để bù tới tổng sức chứa. Tồn từ 7 trở lên không đặt và Aqua giữ công thức riêng.
+V5.2.0 giữ logic đặt hàng hiện tại, tiếp tục dọn code và tách dashboard/tồn cabin sang module riêng để app dễ bảo trì hơn.
 
 Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 
 ## Cấu trúc runtime
 
-- `app.js`: dữ liệu lõi, dashboard, đồng bộ và phân quyền.
+- `app.js`: dữ liệu lõi, đồng bộ và phân quyền.
+- `modules/dashboard.js`: dashboard, tồn cabin, sức khỏe máy và các phần hiển thị theo máy.
+- `modules/order.js`: công thức đặt hàng, quy đổi thùng và logic Aqua theo tổng max slot + dự trữ cabin.
 - `modules/fill.js`, `modules/ncc.js`: nhập Fill và nhập hàng NCC.
 - `modules/stocktake.js`, `modules/transfer.js`: kiểm kê và chuyển tồn.
 - `modules/history.js`, `modules/ui.js`: lịch sử và điều hướng giao diện.
@@ -16,6 +18,7 @@ Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 ## Có gì trong bản này
 
 - Dashboard hoàn chỉnh.
+- Phase 3 V5.2.0 tách dashboard/tồn cabin khỏi `app.js` để giảm độ phình file chính.
 - Tổng hợp đặt NCC hiển thị ngay trên Dashboard.
 - Nút Copy đơn NCC.
 - Fill nhanh theo máy.
@@ -92,8 +95,8 @@ Ví dụ nội dung copy:
 ```text
 Đơn NCC D3:
 D3
-- Aquafina: 2 thùng (56 chai)
-- Pepsi: 1 thùng (24 lon)
+- Aquafina: 3 thùng (84 sản phẩm)
+- Pepsi: 1 thùng (24 sản phẩm)
 ```
 
 Hoặc copy tất cả:
@@ -101,10 +104,10 @@ Hoặc copy tất cả:
 ```text
 Đơn NCC theo máy:
 D3
-- Aquafina: 2 thùng (56 chai)
+- Aquafina: 3 thùng (84 sản phẩm)
 
 D8
-- Boss: 1 thùng (24 lon)
+- Boss: 1 thùng (24 sản phẩm)
 ```
 
 
@@ -120,13 +123,14 @@ Thay đổi:
 ## V2.4 - Sửa logic đặt NCC
 
 Sản phẩm thường:
-- Tồn cabin > 24: không đặt.
-- Tồn cabin 13-24: đặt 1 thùng = 24 lon/chai.
-- Tồn cabin 0-12: đặt 2 thùng = 48 lon/chai.
+- Tồn cabin từ 7 trở lên: không đặt.
+- Tồn cabin 0-6: đặt 1 thùng = 24 sản phẩm.
 
 Aqua/Aquafina:
-- Tồn cabin >= 28: đặt 2 thùng = 56 chai.
-- Tồn cabin < 28: đặt 3 thùng = 84 chai.
+- Tồn cabin từ 56 trở lên: không đặt.
+- Tồn cabin 28-55: đặt 1 thùng = 28 sản phẩm.
+- Tồn cabin 1-27: đặt 2 thùng = 56 sản phẩm.
+- Hết hàng: đặt 3 thùng = 84 sản phẩm.
 
 Dashboard chỉ hiển thị sản phẩm thật sự cần đặt.
 
@@ -391,4 +395,5 @@ Truoc khi dung dong bo V3.5.1, chay lai `sql/supabase_schema.sql` trong Supabase
 ## V3.8.1 - Kiem tra du lieu lech
 
 - Muc cabin am hien Kiem tra trong danh sach chu y thay vi hien so thung can nhap.
+
 

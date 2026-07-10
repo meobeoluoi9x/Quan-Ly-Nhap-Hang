@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.5.0 - transfer.js */
+﻿/* Quản Lý Nhập Hàng V5.2.0 - transfer.js */
 function transferProducts(machine) {
   const products = new Set(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product));
   Object.keys(currentCabin()).forEach(key => {
@@ -99,4 +99,5 @@ function saveTransfer() {
   resetTransfer();
   showToast(`Đã chuyển ${rows.length} sản phẩm từ ${from} sang ${to}.`);
 }
+
 

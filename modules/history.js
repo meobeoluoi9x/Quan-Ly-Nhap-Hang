@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.5.0 - history.js */
+﻿/* Quản Lý Nhập Hàng V5.2.0 - history.js */
 function isTransferRecord(item) {
   return String(item.reason || "").startsWith("Chuyển tồn:");
 }
@@ -73,7 +73,7 @@ function renderHistoryV4Runtime() {
       const from = outgoing[0]?.machine || "?";
       const to = incoming[0]?.machine || "?";
       const products = outgoing.map(item => `${htmlEscape(item.product)}: ${Math.abs(Number(item.qty))}`).join(" · ");
-      const actions = hasPermission("stocktake") ? `<div class="actions"><button class="mini danger" onclick="deleteTransferBatch('${batch.id}')">Xóa phiếu</button></div>` : "";
+      const actions = hasPermission("stocktake") ? `<div class="actions"><button class="mini danger" data-history-action="delete-transfer" data-history-id="${htmlEscape(batch.id)}">Xóa phiếu</button></div>` : "";
       return `<div class="history-row"><div><b>${historyDateTime(batch.sample)} · ${htmlEscape(from)} → ${htmlEscape(to)}</b><span>${products}</span></div><strong>${outgoing.reduce((sum, item) => sum + Math.abs(Number(item.qty)), 0)} sản phẩm</strong>${actions}</div>`;
     }).join("") + historyPaginationHtml(batches.length) || `<p class="muted">Chưa có lịch sử chuyển tồn.</p>`;
     return;
@@ -95,7 +95,7 @@ function renderHistoryV4Runtime() {
       : activeHistoryType === "adjust" ? `${Number(item.actual) - Number(item.qty)} → ${item.actual} (${item.qty > 0 ? "+" : ""}${item.qty})`
       : `${item.qty} sản phẩm`;
     const detail = activeHistoryType === "fill" && item.slot ? `Slot ${item.slot} · ${htmlEscape(item.product)}` : htmlEscape(item.product);
-    const actions = hasPermission(permission) ? `<div class="actions">${activeHistoryType === "adjust" ? "" : `<button class="mini" onclick="edit${type}('${item.id}')">Sửa</button>`}<button class="mini danger" onclick="delete${type}('${item.id}')">Xóa</button></div>` : "";
+    const actions = hasPermission(permission) ? `<div class="actions">${activeHistoryType === "adjust" ? "" : `<button class="mini" data-history-action="edit" data-history-type="${activeHistoryType}" data-history-id="${htmlEscape(item.id)}">Sửa</button>`}<button class="mini danger" data-history-action="delete" data-history-type="${activeHistoryType}" data-history-id="${htmlEscape(item.id)}">Xóa</button></div>` : "";
     return `<div class="history-row"><div><b>${historyDateTime(item)} · ${htmlEscape(item.machine)}</b><span>${detail}</span></div><strong>${amount}</strong>${actions}</div>`;
   }).join("")}</section>`).join("") + historyPaginationHtml(rows.length) || `<p class="muted">Chưa có lịch sử phù hợp.</p>`;
 }
@@ -134,5 +134,6 @@ function exportHistoryCsv() {
     : [historyDateTime(item), item.machine, item.product, Number(item.actual) - Number(item.qty), item.actual, item.qty]);
   downloadCsvFile([header, ...body], `lich-su-${activeHistoryType}-${todayISO()}.csv`);
 }
+
 
 

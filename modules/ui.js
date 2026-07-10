@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.5.0 - ui.js */
+﻿/* Quản Lý Nhập Hàng V5.2.0 - ui.js */
 function activateCabinSubview(name) {
   if (name === "transfer" && !hasPermission("stocktake")) return;
   $$("[data-cabin-view]").forEach(button => button.classList.toggle("active", button.dataset.cabinView === name));
@@ -113,4 +113,5 @@ function renderAll() {
   renderStorageRuleManager();
   applyManagementView();
 }
+
 

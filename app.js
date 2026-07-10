@@ -1,4 +1,4 @@
-const APP_VERSION = "4.5.0";
+const APP_VERSION = "5.2.0";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -121,71 +121,6 @@ let state = loadState();
 
 function makeId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-}
-
-function defaultStorageRules() {
-  return [
-    { id: stableConfigId("storage-rule", "Aqua"), product: "Aqua", no_wrap: true, pack: 28, shelf_per_pack: 1, max_packs: 2, created_at: "", updated_at: "", _sync: "seeded" },
-    { id: stableConfigId("storage-rule", "Sting lon Dâu"), product: "Sting lon Dâu", no_wrap: true, pack: 24, shelf_per_pack: 0.5, max_packs: 2, created_at: "", updated_at: "", _sync: "seeded" }
-  ];
-}
-
-function activeStorageRules() {
-  return (state.productStorageRules || []).filter(rule => !rule.deleted_at);
-}
-
-function storageRuleForProduct(product) {
-  const name = String(product || "").toLocaleLowerCase("vi");
-  return activeStorageRules().find(rule => String(rule.product || "").toLocaleLowerCase("vi") === name) || null;
-}
-
-function productInfo(product) {
-  const rule = storageRuleForProduct(product);
-  return config().products?.[product] || { pack: rule?.pack || (isAquaProduct(product) ? 28 : 24), minPacks: 1 };
-}
-
-function isAquaProduct(product) {
-  const lower = String(product || "").toLowerCase();
-  return lower.includes("aqua") || lower.includes("aquafina");
-}
-
-function packText(qty, product) {
-  const info = productInfo(product);
-  const packs = Math.ceil(Number(qty || 0) / info.pack);
-  return { packs, qty: packs * info.pack, unit: unitName(product), packSize: info.pack };
-}
-
-function clampOrderByStorageLimit(orderQty, stock, product) {
-  const rule = storageRuleForProduct(product);
-  if (!rule || !Number.isFinite(Number(rule.max_packs)) || Number(rule.max_packs) <= 0) {
-    return { qty: orderQty, limited: false, reason: "" };
-  }
-  const pack = Number(rule.pack || productInfo(product).pack || 24);
-  const currentPacks = Math.max(0, Number(stock || 0)) / pack;
-  const remainingPacks = Math.floor(Math.max(0, Number(rule.max_packs) - currentPacks));
-  const wantedPacks = Math.ceil(Number(orderQty || 0) / pack);
-  const allowedPacks = Math.min(wantedPacks, remainingPacks);
-  return {
-    qty: Math.max(0, allowedPacks * pack),
-    limited: allowedPacks < wantedPacks,
-    reason: allowedPacks < wantedPacks ? `Giới hạn tốn chỗ: tối đa ${Number(rule.max_packs)} thùng cabin` : ""
-  };
-}
-
-function suggestOrder(qty, product) {
-  const info = productInfo(product);
-  const stock = Number(qty || 0);
-
-  // Aqua: giảm dần số thùng theo mức tồn, dừng nhập khi đã có từ 56 sản phẩm.
-  if (isAquaProduct(product)) {
-    if (stock >= 56) return 0;
-    if (stock >= 28) return info.pack;
-    if (stock > 0) return info.pack * 2;
-    return info.pack * 3;
-  }
-
-  // Sản phẩm thường chỉ đặt một thùng khi tồn còn tối đa 6 sản phẩm.
-  return stock <= 6 ? info.pack : 0;
 }
 
 function displayCabin() {
@@ -336,33 +271,6 @@ function totalPacks(rows) {
 }
 
 
-function renderRoute() {
-  $("#todayText").textContent = viDate();
-
-  const machines = config().machines.map(machine => machine.name);
-  if (!activeDashboardMachine || !machines.includes(activeDashboardMachine)) {
-    activeDashboardMachine = machines[0] || null;
-  }
-
-  $("#routeBadge").textContent = activeDashboardMachine || "Theo máy";
-  $("#routeMachines").innerHTML = machines.map(machine => {
-    const health = machineHealth(machine);
-    return `<button class="machine-dashboard-tab ${machine === activeDashboardMachine ? "active" : ""} ${health.cls}" data-machine="${htmlEscape(machine)}">
-      <span>${htmlEscape(machine)}</span>
-      <small>${health.label}</small>
-    </button>`;
-  }).join("");
-
-  $$(".machine-dashboard-tab").forEach(button => {
-    button.addEventListener("click", () => {
-      activeDashboardMachine = button.dataset.machine;
-      activeOrderMachine = activeDashboardMachine;
-      localStorage.setItem("fill_assistant_active_machine", activeDashboardMachine);
-      renderAll();
-    });
-  });
-}
-
 function groupOrdersByMachine(rows) {
   const groups = {};
   rows.forEach(row => {
@@ -391,280 +299,6 @@ function copyText(text, message) {
   } else {
     showToast(text);
   }
-}
-
-function renderCabin() {
-  const cab = displayCabin();
-  const rawCabin = currentCabin();
-  const machines = unique([
-    ...config().machines.map(machine => machine.name),
-    ...Object.keys(cab).map(key => key.split("||")[0])
-  ]).sort((a, b) => a.localeCompare(b, "vi"));
-  if (!machines.includes(activeCabinMachine)) activeCabinMachine = machines[0] || "";
-  if ($("#cabinMachine")) {
-    $("#cabinMachine").innerHTML = machines.map(machine => `<option value="${htmlEscape(machine)}">${htmlEscape(machine)}</option>`).join("");
-    $("#cabinMachine").value = activeCabinMachine;
-  }
-  const rows = Object.entries(cab).map(([key, qty]) => {
-    const [machine, product] = key.split("||");
-    const raw = Number(rawCabin[key] || 0);
-    const pack = productInfo(product).pack;
-    const status = raw < 0 ? `Lệch ${Math.abs(raw)}` : qty < 12 ? "Sắp hết" : qty < pack ? "Tồn thấp" : "Ổn";
-    const cls = raw < 0 || qty < 12 ? "red" : qty < pack ? "yellow" : "green";
-    return { machine, product, qty: Number(qty || 0), pack, raw, status, cls };
-  }).filter(item => item.machine === activeCabinMachine)
-    .sort((a, b) => a.product.localeCompare(b.product, "vi"));
-  const total = rows.reduce((sum, item) => sum + item.qty, 0);
-  const attention = rows.filter(item => item.cls !== "green").length;
-  $("#cabinSummary").innerHTML = `<div><span>Sản phẩm</span><b>${rows.length}</b></div><div><span>Tổng tồn</span><b>${total}</b></div><div><span>Cần chú ý</span><b>${attention}</b></div>`;
-  $("#cabinBox").innerHTML = rows.map(item => {
-    const warn = item.raw < 0
-      ? `<span class="small warn-text">Lệch ${Math.abs(item.raw)} sản phẩm</span>`
-      : item.status === "Sắp hết"
-        ? `<span class="cabin-status cabin-status-red">Sắp hết</span>`
-        : item.status === "Tồn thấp"
-          ? `<span class="cabin-status cabin-status-amber">Tồn thấp</span>`
-          : `<span class="cabin-status cabin-status-blue">${htmlEscape(item.status)}</span>`;
-    return `<div class="row qty-row ${item.cls}"><span><b>${htmlEscape(item.product)}</b>${warn}</span><b class="qty-num">${item.qty}</b></div>`;
-  }).join("") || `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
-}
-
-function exportCabinCsv() {
-  const machine = activeCabinMachine;
-  const cab = displayCabin();
-  const rawCabin = currentCabin();
-  const rows = Object.entries(cab).map(([key, qty]) => {
-    const [rowMachine, product] = key.split("||");
-    if (rowMachine !== machine) return null;
-    const raw = Number(rawCabin[key] || 0);
-    const pack = productInfo(product).pack;
-    const status = raw < 0 ? `Lệch ${Math.abs(raw)} sản phẩm` : qty < 12 ? "Sắp hết" : qty < pack ? "Tồn thấp" : "Ổn";
-    return [machine, product, Number(qty || 0), status, pack];
-  }).filter(Boolean).sort((a, b) => a[1].localeCompare(b[1], "vi"));
-  if (!rows.length) return showToast("Máy này chưa có tồn cabin để xuất.");
-  const csvRows = [
-    ["Tồn cabin - Quản Lý Nhập Hàng"],
-    [`Máy: ${machine}`],
-    [`Xuất lúc: ${new Date().toLocaleString("vi-VN")}`],
-    [],
-    ["Máy", "Sản phẩm", "Tồn hiện tại", "Trạng thái", "Sản phẩm/thùng"],
-    ...rows,
-    [],
-    ["TỔNG", "", rows.reduce((sum, row) => sum + Number(row[2] || 0), 0), "", ""]
-  ];
-  const csv = "\ufeff" + csvRows.map(row => row.map(csvCell).join(",")).join("\r\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  a.download = `ton-cabin-${machine.replace(/[^a-zA-Z0-9_-]+/g, "-")}-${todayISO()}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  showToast(`Đã xuất tồn cabin ${machine}.`);
-}
-
-function renderHistoryV4() {
-  const recent = arr => [...arr].reverse().slice(0, 40);
-
-  $("#fillHistory").innerHTML = recent(state.fillLogs).map(item => `
-    <div class="row">
-      <span>${item.date}<br><span class="small">${item.machine} - Slot ${item.slot} - ${item.product}</span></span>
-      <b>${item.qty}</b>
-      <span class="actions">
-        <button class="mini" onclick="editFill('${item.id}')">Sửa</button>
-        <button class="mini danger" onclick="deleteFill('${item.id}')">Xóa</button>
-      </span>
-    </div>
-  `).join("") || `<p class="muted">Chưa có dữ liệu Fill.</p>`;
-
-  $("#nccHistory").innerHTML = recent(state.nccLogs).map(item => `
-    <div class="row">
-      <span>${item.date}<br><span class="small">${item.machine} - ${item.product}</span></span>
-      <b>${item.qty}</b>
-      <span class="actions">
-        <button class="mini" onclick="editNcc('${item.id}')">Sửa</button>
-        <button class="mini danger" onclick="deleteNcc('${item.id}')">Xóa</button>
-      </span>
-    </div>
-  `).join("") || `<p class="muted">Chưa có dữ liệu NCC.</p>`;
-
-  $("#adjustHistory").innerHTML = recent(state.adjustLogs).map(item => `
-    <div class="row">
-      <span>${item.date}<br><span class="small">${item.machine} - ${item.product} - ${item.reason || ""}</span></span>
-      <b>${item.qty > 0 ? "+" + item.qty : item.qty}</b>
-      <span class="actions">
-        <button class="mini" onclick="editAdjust('${item.id}')">Sửa</button>
-        <button class="mini danger" onclick="deleteAdjust('${item.id}')">Xóa</button>
-      </span>
-    </div>
-  `).join("") || `<p class="muted">Chưa có dữ liệu điều chỉnh.</p>`;
-}
-
-function quickFixNegative(machine, product, qty) {
-  if (!confirm(`Tạo điều chỉnh +${qty} cho ${machine} - ${product}?`)) return;
-
-  const item = { id: makeId(), date: todayISO(), machine, product, qty: Number(qty), reason: "Sửa cabin âm" };
-  state.adjustLogs.push(item);
-  lastAction = { type: "deleteAdjust", index: state.adjustLogs.length - 1, item };
-  saveState();
-  showToast("Đã tạo điều chỉnh.", true);
-}
-
-function renderQuickFill() {
-  const machine = $("#quickMachine").value;
-  const slots = config().slots
-    .filter(slot => slot.machine === machine)
-    .sort((a, b) => Number(a.slot) - Number(b.slot));
-
-  if (!slots.length) {
-    $("#quickFillBox").innerHTML = `<p class="muted">Máy này chưa có slot.</p>`;
-    return;
-  }
-
-  $("#quickFillBox").innerHTML = `
-    <div class="quick-fill-list">
-      ${slots.map(slot => `
-        <div class="slot-card" data-machine="${htmlEscape(slot.machine)}" data-slot="${Number(slot.slot)}" data-product="${htmlEscape(slot.product)}">
-          <div class="quick-slot-info">
-            <b>Slot ${slot.slot}</b>
-            <span>${htmlEscape(slot.product)}${slot.max ? ` · Max ${Number(slot.max)}` : ""}</span>
-          </div>
-          <div class="slot-controls compact embedded">
-            <input type="number" min="0" step="1" inputmode="numeric" placeholder="0" />
-            <button type="button" class="clear-slot" data-clear="1">Xóa</button>
-          </div>
-        </div>
-      `).join("")}
-    </div>
-    <div class="quick-fill-footer">
-      <div>
-        <b id="quickFillPending">0 slot</b>
-        <span>có số lượng chờ lưu</span>
-      </div>
-      <div class="quick-fill-footer-actions">
-        <button type="button" id="clearQuickFillBtn" class="btn ghost">Xóa hết</button>
-        <button type="button" id="saveQuickFillBtn" class="btn primary">Lưu các slot đã nhập</button>
-      </div>
-    </div>
-  `;
-
-  const box = $("#quickFillBox");
-
-  box.oninput = event => {
-    if (event.target.matches(".slot-card input")) updateQuickFillPending();
-  };
-
-  box.onclick = event => {
-    const button = event.target.closest("button");
-    if (!button) return;
-
-    const card = button.closest(".slot-card");
-    if (card && button.dataset.clear) {
-      $("input", card).value = "";
-      updateQuickFillPending();
-      return;
-    }
-
-    if (card && button.dataset.val) {
-      const input = $("input", card);
-      input.value = Number(input.value || 0) + Number(button.dataset.val);
-      updateQuickFillPending();
-      return;
-    }
-
-    if (button.id === "clearQuickFillBtn") {
-      $$(".slot-card input", box).forEach(input => { input.value = ""; });
-      updateQuickFillPending();
-      return;
-    }
-
-    if (button.id === "saveQuickFillBtn") {
-      saveQuickFillBatch();
-    }
-  };
-
-  updateQuickFillPending();
-}
-
-function getQuickFillEntries() {
-  return $$(".slot-card", $("#quickFillBox"))
-    .map(card => ({
-      card,
-      machine: card.dataset.machine,
-      slot: Number(card.dataset.slot),
-      product: card.dataset.product,
-      qty: Number($("input", card).value || 0)
-    }))
-    .filter(item => item.qty > 0);
-}
-
-function renderDashboardCabinAudit() {
-  const machine = activeDashboardMachine;
-  const cab = displayCabin();
-  const items = Object.entries(cab)
-    .map(([key, qty]) => {
-      const [m, product] = key.split("||");
-      return { machine: m, product, qty };
-    })
-    .filter(item => item.machine === machine)
-    .sort((a, b) => a.product.localeCompare(b.product, "vi"));
-
-  const box = $("#dashboardCabinAuditBox");
-  if (!box) return;
-
-  box.innerHTML = items.length ? `
-    <div class="cabin-audit-list">
-      ${items.map(item => `
-        <div class="cabin-audit-row" data-machine="${item.machine}" data-product="${item.product}" data-current="${item.qty}">
-          <div>
-            <b>${item.product}</b>
-            <span>Hiện tại: ${item.qty} ${unitName(item.product)}</span>
-          </div>
-          <input type="number" min="0" step="1" inputmode="numeric" value="${item.qty}" />
-          <button class="mini save-audit">Lưu</button>
-        </div>
-      `).join("")}
-    </div>
-  ` : `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
-
-  $$(".save-audit", box).forEach(button => {
-    button.addEventListener("click", () => {
-      const row = button.closest(".cabin-audit-row");
-      const machine = row.dataset.machine;
-      const product = row.dataset.product;
-      const current = Number(row.dataset.current || 0);
-      const actual = Number($("input", row).value || 0);
-      const diff = actual - current;
-
-      if (diff === 0) {
-        showToast(`${product}: không có chênh lệch.`);
-        return;
-      }
-
-      const item = {
-        id: makeId(),
-        date: todayISO(),
-        machine,
-        product,
-        qty: diff,
-        reason: "Kiểm kê"
-      };
-
-      state.adjustLogs.push(item);
-      lastAction = { type: "deleteAdjust", index: state.adjustLogs.length - 1, item };
-      saveState();
-      $("#dashboardCabinAuditCard").classList.remove("hidden");
-      showToast(`Đã điều chỉnh ${product}: ${diff > 0 ? "+" : ""}${diff}.`, true);
-    });
-  });
-}
-
-function machineHealth(machine) {
-  const rows = buildOrderRows().filter(row => row.machine === machine);
-  const hasNegative = negativeCabinItems().some(item => item.machine === machine);
-
-  if (hasNegative) return { cls: "red", label: "Lỗi" };
-  if (rows.some(row => row.pack.packs >= 3)) return { cls: "red", label: "Thiếu nặng" };
-  if (rows.length > 0) return { cls: "yellow", label: "Cần đặt" };
-  return { cls: "green", label: "Ổn" };
 }
 
 function machineOptionsHtml(selected = "") {
@@ -751,23 +385,6 @@ function resetNccBatch() {
   addNccRow();
 }
 
-function saveNccBatch(form) {
-  if (!requirePermission("receive")) return;
-  const rows = mergedNccBatchRows();
-  if (!rows.length) return showToast("Chưa nhập số thùng.");
-  if (rows.some(item => !Number.isInteger(item.boxes) || item.boxes <= 0)) return showToast("Số thùng phải là số nguyên lớn hơn 0.");
-  const batchId = makeId();
-  const recordedAt = new Date().toISOString();
-  const date = form.date.value || todayISO();
-  rows.forEach(item => state.nccLogs.push(touchRecord({
-    id: makeId(), batch_id: batchId, date, machine: item.machine, product: item.product,
-    boxes: item.boxes, qty: item.boxes * productInfo(item.product).pack, recorded_at: recordedAt
-  })));
-  resetNccBatch();
-  saveState();
-  showToast(`Đã lưu lô ${rows.length} dòng, ${rows.reduce((sum, item) => sum + item.boxes, 0)} thùng.`);
-}
-
 function setHistoryRange(days) {
   const end = new Date();
   const start = new Date();
@@ -775,21 +392,6 @@ function setHistoryRange(days) {
   $("#historyDate").value = localISODate(start);
   $("#historyToDate").value = localISODate(end);
   renderHistory();
-}
-
-function filteredHistoryRows() {
-  const [key] = historySource();
-  const fromDate = $("#historyDate")?.value || "";
-  const toDate = $("#historyToDate")?.value || "";
-  if (fromDate && toDate && fromDate > toDate) return [];
-  const machine = $("#historyMachine")?.value || "";
-  const query = ($("#historyProduct")?.value || "").trim().toLocaleLowerCase("vi");
-  return activeLogRows(key).filter(item => (!fromDate || item.date >= fromDate)
-    && (!toDate || item.date <= toDate)
-    && (!machine || canonicalMachineName(item.machine) === machine)
-    && (!query || String(item.product).toLocaleLowerCase("vi").includes(query)))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date))
-      || String(b.recorded_at || b.updated_at || "").localeCompare(String(a.recorded_at || a.updated_at || "")));
 }
 
 function historyDayLabel(date) {
@@ -801,84 +403,6 @@ function historyDayLabel(date) {
   return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString("vi-VN");
 }
 
-function historyTime(item) {
-  const value = item.recorded_at || item.updated_at;
-  if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString("vi-VN", { hour12: false });
-}
-
-function historyRowHtml(item) {
-  const amount = activeHistoryType === "ncc" ? `${nccBoxes(item)} thùng · ${item.qty} sản phẩm`
-    : activeHistoryType === "adjust" ? `${item.qty > 0 ? "+" : ""}${item.qty} sản phẩm` : `${item.qty} sản phẩm`;
-  const detail = activeHistoryType === "fill" ? `Slot ${item.slot} · ${item.product}`
-    : activeHistoryType === "adjust" ? `${item.product} · ${item.reason || "Kiểm kê cabin"}` : item.product;
-  const permission = activeHistoryType === "fill" ? "fill" : activeHistoryType === "ncc" ? "receive" : "stocktake";
-  const actions = hasPermission(permission) ? `<div class="actions"><button class="mini" data-history-action="edit" data-history-type="${activeHistoryType}" data-history-id="${htmlEscape(item.id)}">Sửa</button><button class="mini danger" data-history-action="delete" data-history-type="${activeHistoryType}" data-history-id="${htmlEscape(item.id)}">Xóa</button></div>` : "";
-  return `<div class="history-row"><div><b>${historyTime(item) || "Không rõ giờ"} · ${htmlEscape(item.machine)}</b><span>${htmlEscape(detail)}</span></div><strong>${htmlEscape(amount)}</strong>${actions}</div>`;
-}
-
-function renderHistoryV4Runtime() {
-  const [, label] = historySource();
-  const fromDate = $("#historyDate")?.value || "";
-  const toDate = $("#historyToDate")?.value || "";
-  if (fromDate && toDate && fromDate > toDate) {
-    $("#historyCount").textContent = "0 bản ghi";
-    $("#historyList").innerHTML = `<p class="muted">Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</p>`;
-    if ($("#exportHistoryCsvBtn")) $("#exportHistoryCsvBtn").disabled = true;
-    return;
-  }
-  const rows = filteredHistoryRows();
-  $("#historyCount").textContent = `${rows.length} bản ghi`;
-  const exportButton = $("#exportHistoryCsvBtn");
-  exportButton?.classList.toggle("hidden", !syncUser);
-  if (exportButton) exportButton.disabled = !rows.length;
-  const days = new Map();
-  rows.forEach(item => {
-    if (!days.has(item.date)) days.set(item.date, []);
-    days.get(item.date).push(item);
-  });
-  const historyList = $("#historyList");
-  historyList.innerHTML = [...days.entries()].map(([date, dayRows]) => {
-    let content = "";
-    if (activeHistoryType === "ncc") {
-      const batches = new Map();
-      dayRows.forEach(item => {
-        const key = item.batch_id || item.id;
-        if (!batches.has(key)) batches.set(key, []);
-        batches.get(key).push(item);
-      });
-      content = [...batches.entries()].map(([batchId, batchRows]) => {
-        const boxes = batchRows.reduce((sum, item) => sum + nccBoxes(item), 0);
-        const deleteButton = hasPermission("receive") && batchRows[0].batch_id
-          ? `<button type="button" class="mini danger" data-history-action="delete-batch" data-batch-id="${htmlEscape(batchId)}">Xóa lô</button>` : "";
-        return `<section class="history-batch"><div class="history-batch-head"><span>Lô ${historyTime(batchRows[0]) || "cũ"} · ${batchRows.length} dòng · ${boxes} thùng</span>${deleteButton}</div>${batchRows.map(historyRowHtml).join("")}</section>`;
-      }).join("");
-    } else content = dayRows.map(historyRowHtml).join("");
-    return `<h3 class="history-day">${historyDayLabel(date)} · ${date}</h3>${content}`;
-  }).join("") || `<p class="muted">Chưa có lịch sử ${label} trong khoảng đã chọn.</p>`;
-  historyList.onclick = event => {
-    const button = event.target.closest("[data-history-action]");
-    if (!button) return;
-    if (button.dataset.historyAction === "delete-batch") return deleteNccBatch(button.dataset.batchId);
-    const handlers = {
-      "edit-fill": editFill, "delete-fill": deleteFill,
-      "edit-ncc": editNcc, "delete-ncc": deleteNcc,
-      "edit-adjust": editAdjust, "delete-adjust": deleteAdjust
-    };
-    handlers[`${button.dataset.historyAction}-${button.dataset.historyType}`]?.(button.dataset.historyId);
-  };
-}
-
-function deleteNccBatch(batchId) {
-  if (!requirePermission("receive")) return;
-  const rows = activeLogRows("nccLogs").filter(item => item.batch_id === batchId);
-  if (!rows.length || !confirm(`Xóa toàn bộ lô ${rows.length} dòng?`)) return;
-  rows.forEach(item => touchRecord(item, true));
-  saveState();
-  showToast(`Đã xóa lô ${rows.length} dòng.`);
-}
-
 function downloadCsvFile(rows, filename) {
   const csv = "\ufeff" + rows.map(row => row.map(csvCell).join(",")).join("\r\n");
   const link = document.createElement("a");
@@ -886,79 +410,6 @@ function downloadCsvFile(rows, filename) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
-}
-
-function exportHistoryCsv() {
-  if (!syncUser) return openAuthModal();
-  const rows = filteredHistoryRows();
-  if (!rows.length) return showToast("Không có lịch sử để xuất.");
-  const [, label] = historySource();
-  const csvRows = [
-    [`Lịch sử ${label} - Quản Lý Nhập Hàng`],
-    [`Từ ${$("#historyDate").value || "đầu kỳ"} đến ${$("#historyToDate").value || "hiện tại"}`],
-    [],
-    ["Ngày", "Giờ", "Loại", "Máy", "Slot", "Sản phẩm", "Số thùng", "Số sản phẩm/chênh lệch", "Lý do", "Mã lô", "Người ghi", "ID"]
-  ];
-  rows.forEach(item => csvRows.push([
-    item.date, historyTime(item), label, item.machine, item.slot ?? "", item.product,
-    activeHistoryType === "ncc" ? nccBoxes(item) : "", item.qty, item.reason || "", item.batch_id || "",
-    item.created_by || item.user_id || "", item.id
-  ]));
-  downloadCsvFile(csvRows, `lich-su-${activeHistoryType}-${$("#historyDate").value || "tat-ca"}-${$("#historyToDate").value || todayISO()}.csv`);
-  showToast(`Đã xuất ${rows.length} bản ghi CSV.`);
-}
-
-function renderSlow() {
-  const machine = activeDashboardMachine;
-  const pairs = unique(config().slots
-    .filter(slot => slot.machine === machine)
-    .map(slot => `${slot.machine}||${slot.product}`));
-
-  const rows = pairs.map(key => {
-    const [machineName, product] = key.split("||");
-    const total30 = getRecentFill(product, machineName, 30);
-    const count = state.fillLogs.filter(log => log.machine === machineName && log.product === product).length;
-
-    let cls = "blue";
-    let status = `Đang học (${count}/5 lần fill)`;
-    if (count >= 5 && total30 <= 5) {
-      cls = "yellow";
-      status = "Bán chậm 30 ngày";
-    }
-    if (count >= 5 && total30 > 30) {
-      cls = "green";
-      status = "Bán tốt";
-    }
-    return { product, total30, count, cls, status };
-  });
-
-  $("#slowBox").innerHTML = rows.slice(0, 12).map(item => `
-    <div class="compact-info-row ${item.cls}">
-      <b>${htmlEscape(item.product)}</b>
-      <span>${htmlEscape(item.status)} · Fill 30 ngày: ${item.total30}</span>
-    </div>
-  `).join("") || `<p class="muted">Máy này chưa có dữ liệu slot.</p>`;
-}
-
-function renderSelectedCabin() {
-  const machine = activeDashboardMachine;
-  const cab = displayCabin();
-  const items = Object.entries(cab)
-    .map(([key, qty]) => {
-      const [m, product] = key.split("||");
-      return { machine: m, product, qty, raw: currentCabin()[key] || 0 };
-    })
-    .filter(item => item.machine === machine)
-    .sort((a, b) => a.product.localeCompare(b.product, "vi"));
-
-  const box = $("#selectedCabinBox");
-  if (!box) return;
-
-  box.innerHTML = items.length ? items.map(item => {
-    const cls = item.raw < 0 ? "red" : item.qty < 12 ? "red" : item.qty < productInfo(item.product).pack ? "yellow" : "green";
-    const warn = item.raw < 0 ? ` · Lệch ${Math.abs(item.raw)} ${unitName(item.product)}` : "";
-    return `<div class="compact-info-row ${cls}"><b>${htmlEscape(item.product)}</b><span>${item.qty} ${unitName(item.product)}${htmlEscape(warn)}</span></div>`;
-  }).join("") : `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
 }
 
 function htmlEscape(value) {
@@ -1323,86 +774,6 @@ function saveNccFromForm(form) {
   showToast(`Đã lưu ${boxes} thùng = ${item.qty} sản phẩm.`);
 }
 
-function updateQuickFillPending() {
-  const pending = getQuickFillEntries();
-  const total = pending.reduce((sum, item) => sum + item.qty, 0);
-  const label = $("#quickFillPending");
-  if (label) label.textContent = `${pending.length} slot · ${total} sản phẩm`;
-}
-
-function saveQuickFillBatch() {
-  if (!requirePermission("fill")) return;
-  const invalid = $$(".slot-card input", $("#quickFillBox")).filter(input => {
-    const raw = input.value.trim();
-    if (!raw || raw === "0") return false;
-    const value = Number(raw);
-    return !Number.isInteger(value) || value < 0;
-  });
-  if (invalid.length) return showToast("Số lượng Fill phải là số nguyên từ 0 trở lên.");
-  const entries = getQuickFillEntries();
-  if (!entries.length) return showToast("Chưa nhập số lượng fill.");
-  const large = entries.filter(item => item.qty > 50);
-  if (large.length && !confirm(`Có số lượng lớn ở ${large.length} slot. Lưu tất cả?`)) return;
-  const date = $("#quickDate").value || todayISO();
-  const recordedAt = new Date().toISOString();
-  entries.forEach(item => state.fillLogs.push(touchRecord({
-    id: makeId(), date, machine: item.machine, slot: item.slot, product: item.product, qty: item.qty,
-    recorded_at: recordedAt
-  })));
-  entries.forEach(item => { $("input", item.card).value = ""; });
-  saveState();
-  showToast(`Đã lưu ${entries.length} slot fill.`);
-}
-
-function renderStocktake() {
-  const machine = $("#stocktakeMachine").value;
-  const cab = displayCabin();
-  const items = Object.entries(cab).map(([key, qty]) => {
-    const [m, product] = key.split("||");
-    return { machine: m, product, qty };
-  }).filter(item => item.machine === machine).sort((a, b) => a.product.localeCompare(b.product, "vi"));
-  $("#stocktakeBox").innerHTML = items.length ? `
-    <div class="stocktake-list">${items.map(item => `
-      <label class="stocktake-row" data-product="${htmlEscape(item.product)}" data-current="${item.qty}">
-        <span><b>${htmlEscape(item.product)}</b><small>Hiện tại: ${item.qty} sản phẩm</small></span>
-        <input type="number" step="1" inputmode="numeric" value="${item.qty}" />
-      </label>`).join("")}</div>
-    <div class="stocktake-actions"><button id="resetStocktakeBtn" type="button" class="btn ghost">Nhập lại</button><button id="saveStocktakeBtn" type="button" class="btn primary">Lưu kiểm kê</button></div>
-  ` : `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
-}
-
-function saveStocktakeBatch() {
-  if (!requirePermission("stocktake")) return;
-  const machine = $("#stocktakeMachine").value;
-  const date = $("#stocktakeDate").value || todayISO();
-  const batchId = makeId();
-  const recordedAt = new Date().toISOString();
-  const entries = $$(".stocktake-row", $("#stocktakeBox")).map(row => {
-    const current = Number(row.dataset.current || 0);
-    const raw = $("input", row).value.trim();
-    const actual = Number(raw);
-    return { product: row.dataset.product, current, actual, diff: actual - current };
-  });
-  if (entries.some(item => !Number.isInteger(item.actual))) {
-    return showToast("Tồn kiểm kê phải là số nguyên.");
-  }
-  const changes = entries.filter(item => item.diff !== 0);
-  if (!changes.length) return showToast("Không có chênh lệch để lưu.");
-  changes.forEach(change => state.adjustLogs.push(touchRecord({
-    id: makeId(), batch_id: batchId, date, machine, product: change.product,
-    qty: change.diff, actual: change.actual, reason: "Kiểm kê cabin", recorded_at: recordedAt
-  })));
-  saveState();
-  renderStocktake();
-  showToast(`Đã lưu kiểm kê, ${changes.length} sản phẩm có chênh lệch.`);
-}
-
-function historySource() {
-  return activeHistoryType === "fill" ? ["fillLogs", "Nhập Fill"]
-    : activeHistoryType === "ncc" ? ["nccLogs", "Nhập hàng"]
-    : ["adjustLogs", "Kiểm kê cabin"];
-}
-
 function historyDateTime(item) {
   if (!item.recorded_at) return item.date;
   const recorded = new Date(item.recorded_at);
@@ -1760,13 +1131,6 @@ function setupSyncForms() {
   }, 30000);
 }
 
-function renderAll() {
-  cabinSnapshot = null;
-  renderRoute(); renderSummary(); renderOrders(); renderSlow(); renderCabin(); renderHistory(); renderAudit(); renderSelectedCabin(); renderSyncStatus();
-  if (!$("#quickfill").classList.contains("active") || !$("#quickFillBox .slot-card")) renderQuickFill();
-  if (!$("#audit").classList.contains("active") || !$("#stocktakeBox .stocktake-row")) renderStocktake();
-}
-
 window.addEventListener("beforeinstallprompt", event => {
   event.preventDefault();
   deferredPrompt = event;
@@ -1783,14 +1147,6 @@ $("#installBtn")?.addEventListener("click", async () => {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js");
 }
-
-ensureSyncView();
-setupTabs();
-setupForms();
-setupSyncForms();
-setupQuickPads();
-renderAll();
-initSyncClient().then(() => queueAutoSync()).catch(() => renderSyncStatus());
 
 /* V4.1.0 - Quản Lý Nhập Hàng */
 var selectedMachineEditorId = null;
@@ -1848,8 +1204,15 @@ function seedProductStorageRules() {
   state.productStorageRules ||= [];
   let changed = false;
   defaultStorageRules().forEach(defaultRule => {
-    const exists = state.productStorageRules.some(rule => !rule.deleted_at && String(rule.product || "").toLocaleLowerCase("vi") === defaultRule.product.toLocaleLowerCase("vi"));
-    if (exists) return;
+    const existingRule = state.productStorageRules.find(rule => !rule.deleted_at && String(rule.product || "").toLocaleLowerCase("vi") === defaultRule.product.toLocaleLowerCase("vi"));
+    if (existingRule) {
+      if (isAquaProduct(existingRule.product) && Number(existingRule.max_packs) < 3) {
+        existingRule.max_packs = 3;
+        existingRule.updated_at = now;
+        changed = true;
+      }
+      return;
+    }
     state.productStorageRules.push({ ...defaultRule, created_at: now, updated_at: now });
     changed = true;
   });
@@ -1918,55 +1281,8 @@ function getRecentFill(product, machine, days) {
     .reduce((sum, log) => sum + Number(log.qty || 0), 0);
 }
 
-function machineProductLayout(machine, product) {
-  const slots = config().slots.filter(slot => slot.machine === machine && slot.product === product);
-  return {
-    slotCount: slots.length,
-    capacity: slots.reduce((sum, slot) => sum + Number(slot.max || 0), 0),
-    slots: slots.map(slot => Number(slot.slot)).sort((a, b) => a - b)
-  };
-}
-
 function expectedDemandBeforeNextVisit(machine, product) {
   return 0;
-}
-
-function suggestedOrderForLayout(stock, product, layout, projected) {
-  const pack = productInfo(product).pack;
-  if (isAquaProduct(product)) return suggestOrder(projected, product);
-  if (projected > 6) return 0;
-  if (layout.slotCount > 1 && layout.capacity > pack) {
-    const shortage = Math.max(pack, layout.capacity - Math.max(0, projected));
-    return Math.ceil(shortage / pack) * pack;
-  }
-  return pack;
-}
-
-function buildOrderRows() {
-  const rawCabin = currentCabin();
-  const keys = new Set(Object.keys(rawCabin));
-  config().slots.forEach(slot => keys.add(`${slot.machine}||${slot.product}`));
-  const rows = [];
-  keys.forEach(key => {
-    const [machine, product] = key.split("||");
-    const raw = Number(rawCabin[key] || 0);
-    if (raw < 0) return;
-    const qty = Math.max(0, raw);
-    const layout = machineProductLayout(machine, product);
-    const expectedDemand = expectedDemandBeforeNextVisit(machine, product);
-    const projected = Math.max(0, qty - expectedDemand);
-    const suggested = suggestedOrderForLayout(qty, product, layout, projected);
-    const storageLimit = clampOrderByStorageLimit(suggested, qty, product);
-    const order = storageLimit.qty;
-    if (order > 0) rows.push({
-      machine, product, qty, raw, order, projected, expectedDemand,
-      capacity: layout.capacity, slotCount: layout.slotCount, slots: layout.slots,
-      pack: packText(order, product),
-      storageLimited: storageLimit.limited,
-      storageReason: storageLimit.reason
-    });
-  });
-  return rows.sort((a, b) => a.machine.localeCompare(b.machine, "vi") || a.product.localeCompare(b.product, "vi"));
 }
 
 function dashboardAttentionRows(machine) {
@@ -2459,7 +1775,7 @@ function renderAuthUI() {
 }
 
 function ensureSyncView() {
-  if ($(".app-header p")) $(".app-header p").textContent = `V${APP_VERSION} - Hàng tốn chỗ`;
+  if ($(".app-header p")) $(".app-header p").textContent = `V${APP_VERSION} - Tách dashboard`;
   const cfg = syncConfig();
   $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
   if ($("#syncConfigForm")) { $("#syncConfigForm").url.value = cfg.url || ""; $("#syncConfigForm").key.value = cfg.key || ""; }
@@ -2557,12 +1873,3 @@ function authoritativeState(incomingState) {
   });
   return result;
 }
-
-window.FILL_BASE_CONFIG ||= window.FILL_CONFIG;
-seedMachineConfig();
-seedProductStorageRules();
-refreshOperationalSelects();
-renderMachineManager();
-renderStorageRuleManager();
-renderAll();
-

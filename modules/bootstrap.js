@@ -1,6 +1,16 @@
-/* Quản Lý Nhập Hàng V4.5.0 - bootstrap.js */
-function setupV42() {
-  if ($(".app-header p")) $(".app-header p").textContent = "V4.5.0 - Hàng tốn chỗ";
+﻿/* Quản Lý Nhập Hàng V5.2.0 - bootstrap.js */
+function bootApp() {
+  if ($(".app-header p")) $(".app-header p").textContent = "V5.2.0 - Tách dashboard";
+  ensureSyncView();
+  setupTabs();
+  setupForms();
+  setupSyncForms();
+  setupQuickPads();
+  window.FILL_BASE_CONFIG ||= window.FILL_CONFIG;
+  seedMachineConfig();
+  seedProductStorageRules();
+  refreshOperationalSelects();
+
   $("#quickDate")?.addEventListener("change", persistQuickDraft);
   $("#quickMachine")?.addEventListener("change", renderQuickFill);
   $$(".operation-tab").forEach(button => button.addEventListener("click", () => activateView(button.dataset.operationView)));
@@ -46,10 +56,21 @@ function setupV42() {
   $("#stocktakeBox")?.addEventListener("input", updateStocktakePreview);
   $("#historyList")?.addEventListener("click", event => {
     const button = event.target.closest("[data-history-page]");
-    if (!button || button.disabled) return;
-    v42HistoryPage += button.dataset.historyPage === "next" ? 1 : -1;
-    renderHistoryV4Runtime();
-    $("#historyList")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (button && !button.disabled) {
+      v42HistoryPage += button.dataset.historyPage === "next" ? 1 : -1;
+      renderHistoryV4Runtime();
+      $("#historyList")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    const action = event.target.closest("[data-history-action]");
+    if (!action) return;
+    if (action.dataset.historyAction === "delete-transfer") return deleteTransferBatch(action.dataset.historyId);
+    const handlers = {
+      "edit-fill": editFill, "delete-fill": deleteFill,
+      "edit-ncc": editNcc, "delete-ncc": deleteNcc,
+      "delete-adjust": deleteAdjust
+    };
+    handlers[`${action.dataset.historyAction}-${action.dataset.historyType}`]?.(action.dataset.historyId);
   });
   $$("[data-cabin-view]").forEach(button => button.addEventListener("click", () => activateCabinSubview(button.dataset.cabinView)));
   $("#addTransferRowBtn")?.addEventListener("click", () => addTransferRow());
@@ -118,7 +139,9 @@ function setupV42() {
   renderMachineManager(true);
   renderStorageRuleManager();
   applyManagementView();
+  renderAll();
+  initSyncClient().then(() => queueAutoSync()).catch(() => renderSyncStatus());
 }
 
-setupV42();
+bootApp();
 
