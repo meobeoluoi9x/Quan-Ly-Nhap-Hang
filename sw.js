@@ -1,4 +1,4 @@
-const CACHE = "quan-ly-nhap-hang-v4-4-4";
+const CACHE = "quan-ly-nhap-hang-v4-5-0";
 const ASSETS = [
   "./", "./index.html", "./styles.css", "./data.js", "./app.js", "./manifest.json",
   "./modules/runtime-core.js", "./modules/fill.js", "./modules/ncc.js", "./modules/stocktake.js",

@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.4.4 - ui.js */
+/* Quản Lý Nhập Hàng V4.5.0 - ui.js */
 function activateCabinSubview(name) {
   if (name === "transfer" && !hasPermission("stocktake")) return;
   $$("[data-cabin-view]").forEach(button => button.classList.toggle("active", button.dataset.cabinView === name));
@@ -15,15 +15,18 @@ function applyManagementView() {
   if (!select) return;
   const canManage = hasPermission("manage");
   const layoutOption = select.querySelector('option[value="layout"]');
+  const storageOption = select.querySelector('option[value="storage"]');
   if (layoutOption) layoutOption.disabled = !canManage;
+  if (storageOption) storageOption.disabled = !canManage;
   let value = select.value || localStorage.getItem(V42_MANAGEMENT) || "account";
-  if (value === "layout" && !canManage) value = "account";
+  if ((value === "layout" || value === "storage") && !canManage) value = "account";
   select.value = value;
   localStorage.setItem(V42_MANAGEMENT, value);
   $$(".management-panel").forEach(panel => {
-    const adminPanel = panel.id === "memberAdminCard" || panel.id === "machineAdminCard";
+    const adminPanel = panel.id === "memberAdminCard" || panel.id === "machineAdminCard" || panel.id === "storageRuleCard";
     panel.classList.toggle("management-hidden", panel.dataset.managementPanel !== value || (adminPanel && !canManage));
   });
+  if (value === "storage" && canManage) renderStorageRuleManager();
 }
 
 function activateView(name) {
@@ -94,6 +97,7 @@ function applyPermissions() {
   if (authRequired && !authenticated) activateView("dashboard");
   $("#memberAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#machineAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
+  $("#storageRuleCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
   if ($("#quickfill")?.classList.contains("active") && !hasPermission("fill")) activateView("cabin");
   if ($("#ncc")?.classList.contains("active") && !hasPermission("receive")) activateView("cabin");
@@ -106,6 +110,7 @@ function renderAll() {
   if (!$("#quickfill").classList.contains("active") || !$("#quickFillBox .slot-card")) renderQuickFill();
   if (!$("#audit").classList.contains("active") || !$("#stocktakeBox .stocktake-row")) renderStocktake();
   updateTransferPreview();
+  renderStorageRuleManager();
   applyManagementView();
 }
 

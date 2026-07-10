@@ -351,7 +351,7 @@ main{max-width:1120px;padding:14px}
   .cabin-summary{grid-template-columns:1fr 1fr 1fr}
 }
 
-/* V4.4.4 */
+/* V4.5.0 */
 .operation-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 0 12px;padding:4px;border:1px solid #cbd5e1;border-radius:8px;background:#e2e8f0}
 .operation-tab{min-height:42px;padding:9px 10px;border-radius:6px;background:transparent;color:#334155;font-size:13px}
 .operation-tab.active{background:#0f172a;color:white}
@@ -389,6 +389,13 @@ main{max-width:1120px;padding:14px}
 .product-picker-menu button{display:block;width:100%;padding:9px 10px;border-radius:5px;background:white;color:#0f172a;text-align:left}
 .product-picker-menu button:hover,.product-picker-menu button:focus{background:#dbeafe}
 .product-picker-menu span{display:block;padding:9px;color:#64748b;font-size:12px}
+.storage-rule-head,.storage-rule-row{display:grid;grid-template-columns:minmax(170px,1.3fr) minmax(84px,.55fr) minmax(96px,.65fr) minmax(108px,.75fr) 42px;gap:8px;align-items:center}
+.storage-rule-head{margin:10px 0 6px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase}
+.storage-rule-rows{display:grid;gap:8px}
+.storage-rule-row{padding:10px;border:1px solid #dbe3ee;border-radius:8px;background:#f8fafc}
+.storage-rule-row input{padding:10px;border-radius:7px;font-size:14px}
+.storage-rule-row .remove-storage-rule{width:38px;height:38px;padding:0;border-radius:7px;background:#fee2e2;color:#b91c1c;font-size:20px}
+.storage-note{display:block;margin-top:3px;color:#64748b;font-size:11px;font-weight:800}
 
 @media(max-width:720px){
   .operation-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -400,6 +407,10 @@ main{max-width:1120px;padding:14px}
   .ncc-product-card .bulk-box-control{grid-column:1}
   .ncc-product-card .clear-ncc-row{grid-column:2;grid-row:2}
   .ncc-product-card .bulk-boxes{min-height:52px;font-size:24px}
+  .storage-rule-head{display:none}
+  .storage-rule-row{grid-template-columns:1fr 1fr 42px}
+  .storage-rule-row .storage-product{grid-column:1/3}
+  .storage-rule-row .remove-storage-rule{grid-column:3;grid-row:1}
   .transfer-head-grid{grid-template-columns:1fr}
   .transfer-row{grid-template-columns:minmax(0,1fr) 96px 38px}
   .management-picker-card label{grid-template-columns:1fr}

@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V4.4.4 - fill.js */
+/* Quản Lý Nhập Hàng V4.5.0 - fill.js */
 function quickFillProductsForMachine(machine) {
   return unique(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product))
     .sort((a, b) => a.localeCompare(b, "vi"));

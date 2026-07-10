@@ -1,6 +1,6 @@
-/* Quản Lý Nhập Hàng V4.4.4 - bootstrap.js */
+/* Quản Lý Nhập Hàng V4.5.0 - bootstrap.js */
 function setupV42() {
-  if ($(".app-header p")) $(".app-header p").textContent = "V4.4.4 - Đủ hàng nhiều slot";
+  if ($(".app-header p")) $(".app-header p").textContent = "V4.5.0 - Hàng tốn chỗ";
   $("#quickDate")?.addEventListener("change", persistQuickDraft);
   $("#quickMachine")?.addEventListener("change", renderQuickFill);
   $$(".operation-tab").forEach(button => button.addEventListener("click", () => activateView(button.dataset.operationView)));
@@ -116,6 +116,7 @@ function setupV42() {
   renderStocktake();
   renderHistoryV4Runtime();
   renderMachineManager(true);
+  renderStorageRuleManager();
   applyManagementView();
 }
 

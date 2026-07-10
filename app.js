@@ -1,4 +1,4 @@
-const APP_VERSION = "4.4.4";
+const APP_VERSION = "4.5.0";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -123,8 +123,25 @@ function makeId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 }
 
+function defaultStorageRules() {
+  return [
+    { id: stableConfigId("storage-rule", "Aqua"), product: "Aqua", no_wrap: true, pack: 28, shelf_per_pack: 1, max_packs: 2, created_at: "", updated_at: "", _sync: "seeded" },
+    { id: stableConfigId("storage-rule", "Sting lon Dâu"), product: "Sting lon Dâu", no_wrap: true, pack: 24, shelf_per_pack: 0.5, max_packs: 2, created_at: "", updated_at: "", _sync: "seeded" }
+  ];
+}
+
+function activeStorageRules() {
+  return (state.productStorageRules || []).filter(rule => !rule.deleted_at);
+}
+
+function storageRuleForProduct(product) {
+  const name = String(product || "").toLocaleLowerCase("vi");
+  return activeStorageRules().find(rule => String(rule.product || "").toLocaleLowerCase("vi") === name) || null;
+}
+
 function productInfo(product) {
-  return config().products?.[product] || { pack: isAquaProduct(product) ? 28 : 24, minPacks: 1 };
+  const rule = storageRuleForProduct(product);
+  return config().products?.[product] || { pack: rule?.pack || (isAquaProduct(product) ? 28 : 24), minPacks: 1 };
 }
 
 function isAquaProduct(product) {
@@ -136,6 +153,23 @@ function packText(qty, product) {
   const info = productInfo(product);
   const packs = Math.ceil(Number(qty || 0) / info.pack);
   return { packs, qty: packs * info.pack, unit: unitName(product), packSize: info.pack };
+}
+
+function clampOrderByStorageLimit(orderQty, stock, product) {
+  const rule = storageRuleForProduct(product);
+  if (!rule || !Number.isFinite(Number(rule.max_packs)) || Number(rule.max_packs) <= 0) {
+    return { qty: orderQty, limited: false, reason: "" };
+  }
+  const pack = Number(rule.pack || productInfo(product).pack || 24);
+  const currentPacks = Math.max(0, Number(stock || 0)) / pack;
+  const remainingPacks = Math.floor(Math.max(0, Number(rule.max_packs) - currentPacks));
+  const wantedPacks = Math.ceil(Number(orderQty || 0) / pack);
+  const allowedPacks = Math.min(wantedPacks, remainingPacks);
+  return {
+    qty: Math.max(0, allowedPacks * pack),
+    limited: allowedPacks < wantedPacks,
+    reason: allowedPacks < wantedPacks ? `Giới hạn tốn chỗ: tối đa ${Number(rule.max_packs)} thùng cabin` : ""
+  };
 }
 
 function suggestOrder(qty, product) {
@@ -341,7 +375,7 @@ function groupOrdersByMachine(rows) {
 function formatMachineOrder(machine, rows) {
   const lines = [`${machine}`];
   rows.forEach(row => {
-    lines.push(`- ${row.product}: ${row.pack.packs} thùng (${row.pack.qty} ${row.pack.unit})`);
+    lines.push(`- ${row.product}: ${row.pack.packs} thùng (${row.pack.qty} ${row.pack.unit})${row.storageReason ? ` - ${row.storageReason}` : ""}`);
   });
   return lines.join("\\n");
 }
@@ -1157,6 +1191,10 @@ function markStatePending() {
       item.device_id ||= deviceId();
     });
   });
+  (state.productStorageRules || []).forEach(item => {
+    if (!item.created_at || !item.updated_at) touchConfigRecord(item, Boolean(item.deleted_at));
+    item.device_id ||= deviceId();
+  });
 }
 
 function saveState() {
@@ -1761,7 +1799,7 @@ var machineEditorDirty = false;
 
 function normalizeState(value) {
   const normalized = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  ["fillLogs", "nccLogs", "adjustLogs", "machineConfigs", "machineSlots"].forEach(key => {
+  ["fillLogs", "nccLogs", "adjustLogs", "machineConfigs", "machineSlots", "productStorageRules"].forEach(key => {
     if (!Array.isArray(normalized[key])) normalized[key] = [];
   });
   return normalized;
@@ -1803,6 +1841,19 @@ function seedMachineConfig() {
     _sync: "seeded"
   }));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function seedProductStorageRules() {
+  const now = new Date().toISOString();
+  state.productStorageRules ||= [];
+  let changed = false;
+  defaultStorageRules().forEach(defaultRule => {
+    const exists = state.productStorageRules.some(rule => !rule.deleted_at && String(rule.product || "").toLocaleLowerCase("vi") === defaultRule.product.toLocaleLowerCase("vi"));
+    if (exists) return;
+    state.productStorageRules.push({ ...defaultRule, created_at: now, updated_at: now });
+    changed = true;
+  });
+  if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function activeMachineConfigs() {
@@ -1904,11 +1955,15 @@ function buildOrderRows() {
     const layout = machineProductLayout(machine, product);
     const expectedDemand = expectedDemandBeforeNextVisit(machine, product);
     const projected = Math.max(0, qty - expectedDemand);
-    const order = suggestedOrderForLayout(qty, product, layout, projected);
+    const suggested = suggestedOrderForLayout(qty, product, layout, projected);
+    const storageLimit = clampOrderByStorageLimit(suggested, qty, product);
+    const order = storageLimit.qty;
     if (order > 0) rows.push({
       machine, product, qty, raw, order, projected, expectedDemand,
       capacity: layout.capacity, slotCount: layout.slotCount, slots: layout.slots,
-      pack: packText(order, product)
+      pack: packText(order, product),
+      storageLimited: storageLimit.limited,
+      storageReason: storageLimit.reason
     });
   });
   return rows.sort((a, b) => a.machine.localeCompare(b.machine, "vi") || a.product.localeCompare(b.product, "vi"));
@@ -1956,7 +2011,9 @@ function setupForms() {
     state = authoritativeState(window.FILL_STATE || {});
     state.machineConfigs = [];
     state.machineSlots = [];
+    state.productStorageRules = [];
     seedMachineConfig();
+    seedProductStorageRules();
     saveState();
   });
   $("#exportBtn")?.addEventListener("click", exportJSON);
@@ -1999,6 +2056,72 @@ function addLayoutEditorRow(values = {}) {
 function updateMachineSlotCount() {
   const count = $$(".layout-editor-row", $("#layoutEditorRows")).length;
   if ($("#machineSlotCount")) $("#machineSlotCount").textContent = String(count);
+}
+
+function addStorageRuleRow(values = {}) {
+  const box = $("#storageRuleRows");
+  if (!box) return;
+  const row = document.createElement("div");
+  row.className = "storage-rule-row";
+  row.dataset.id = values.id || "";
+  row.innerHTML = `
+    <input class="storage-product" type="text" list="layoutProductList" value="${htmlEscape(values.product || "")}" placeholder="Chọn hoặc gõ sản phẩm" aria-label="Sản phẩm" autocomplete="off" />
+    <input class="storage-pack" type="number" min="1" step="1" value="${Number(values.pack || 24)}" aria-label="Sản phẩm mỗi thùng" />
+    <input class="storage-shelf" type="number" min="0" step="0.25" value="${Number(values.shelf_per_pack ?? 0.5)}" aria-label="Ngăn mỗi thùng" />
+    <input class="storage-max" type="number" min="0" step="1" value="${Number(values.max_packs || 2)}" aria-label="Giới hạn thùng cabin" />
+    <button type="button" class="remove-storage-rule" data-remove-storage-rule aria-label="Xóa cấu hình">×</button>`;
+  box.appendChild(row);
+}
+
+function renderStorageRuleManager() {
+  const card = $("#storageRuleCard");
+  const box = $("#storageRuleRows");
+  if (!card || !box) return;
+  const canManage = hasPermission("manage");
+  card.classList.toggle("hidden", !canManage);
+  if (!canManage) return;
+  box.innerHTML = "";
+  activeStorageRules().sort((a, b) => String(a.product).localeCompare(String(b.product), "vi")).forEach(addStorageRuleRow);
+  if (!box.children.length) defaultStorageRules().forEach(addStorageRuleRow);
+}
+
+function saveStorageRules() {
+  if (!requirePermission("manage")) return;
+  const cleanLabel = value => String(value || "").replace(/\s+/g, " ").trim();
+  const knownProducts = allProducts();
+  const rows = $$(".storage-rule-row", $("#storageRuleRows")).map(row => {
+    const enteredProduct = cleanLabel($(".storage-product", row).value);
+    const existingProduct = knownProducts.find(product => product.toLocaleLowerCase("vi") === enteredProduct.toLocaleLowerCase("vi"));
+    return {
+      id: row.dataset.id || stableConfigId("storage-rule", existingProduct || enteredProduct),
+      product: existingProduct || enteredProduct,
+      no_wrap: true,
+      pack: Number($(".storage-pack", row).value),
+      shelf_per_pack: Number($(".storage-shelf", row).value),
+      max_packs: Number($(".storage-max", row).value)
+    };
+  }).filter(row => row.product);
+  if (rows.some(row => row.product.includes("||") || row.product.length > 120 || !Number.isInteger(row.pack) || row.pack < 1 || !Number.isFinite(row.shelf_per_pack) || row.shelf_per_pack < 0 || !Number.isInteger(row.max_packs) || row.max_packs < 0)) {
+    return showToast("Kiểm tra lại sản phẩm, quy cách thùng và giới hạn cabin.");
+  }
+  const uniqueNames = new Set(rows.map(row => row.product.toLocaleLowerCase("vi")));
+  if (uniqueNames.size !== rows.length) return showToast("Sản phẩm tốn chỗ không được trùng nhau.");
+  state.productStorageRules ||= [];
+  const keep = new Set(rows.map(row => row.id));
+  state.productStorageRules.filter(rule => !rule.deleted_at && !keep.has(rule.id)).forEach(rule => touchConfigRecord(rule, true));
+  rows.forEach(values => {
+    let rule = state.productStorageRules.find(item => item.id === values.id);
+    if (!rule) { rule = { id: values.id }; state.productStorageRules.push(rule); }
+    Object.assign(rule, values);
+    delete rule.deleted_at;
+    touchConfigRecord(rule);
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  cabinSnapshot = null;
+  renderStorageRuleManager();
+  renderAll();
+  queueAutoSync();
+  showToast("Đã lưu cấu hình hàng tốn chỗ.");
 }
 
 function confirmDiscardMachineDraft() {
@@ -2168,6 +2291,16 @@ function setupMachineManagerEvents() {
     updateMachineSlotCount();
     showToast("Đã sao chép layout. Bấm Lưu để xác nhận.");
   });
+  $("#addStorageRuleBtn")?.addEventListener("click", () => addStorageRuleRow({ pack: 24, shelf_per_pack: 0.5, max_packs: 2 }));
+  $("#storageRuleRows")?.addEventListener("click", event => {
+    const remove = event.target.closest("[data-remove-storage-rule]");
+    if (!remove) return;
+    remove.closest(".storage-rule-row").remove();
+  });
+  $("#storageRuleForm")?.addEventListener("submit", event => {
+    event.preventDefault();
+    saveStorageRules();
+  });
 }
 
 function prepareLocalRowsForWorkspace() {
@@ -2182,7 +2315,7 @@ function prepareLocalRowsForWorkspace() {
     });
   });
   if (syncAccess.is_admin) {
-    ["machineConfigs", "machineSlots"].forEach(key => state[key].forEach(item => {
+    ["machineConfigs", "machineSlots", "productStorageRules"].forEach(key => state[key].forEach(item => {
       if (!item.workspace_id) item.workspace_id = syncAccess.workspace_id;
       if (item._sync === "seeded" || !item.updated_at) item._sync = "pending";
       changed = true;
@@ -2192,7 +2325,7 @@ function prepareLocalRowsForWorkspace() {
 }
 
 function pendingSyncCount() {
-  return ["fillLogs", "nccLogs", "adjustLogs", "machineConfigs", "machineSlots"]
+  return ["fillLogs", "nccLogs", "adjustLogs", "machineConfigs", "machineSlots", "productStorageRules"]
     .reduce((sum, key) => sum + (state[key] || []).filter(item => item._sync === "pending").length, 0);
 }
 
@@ -2219,7 +2352,8 @@ function mergeConfigRows(key, remoteRows) {
 async function syncMachineConfig(publicOnly) {
   const definitions = [
     { table: "machines", key: "machineConfigs", publicFields: "id,name,original_name,aliases,group_name,cycle_days,archived,created_at,updated_at,deleted_at", fields: ["id", "workspace_id", "name", "original_name", "aliases", "group_name", "cycle_days", "archived", "created_at", "updated_at", "deleted_at", "device_id"] },
-    { table: "machine_slots", key: "machineSlots", publicFields: "id,machine_id,slot_number,product,capacity,initial_machine,archived,created_at,updated_at,deleted_at", fields: ["id", "workspace_id", "machine_id", "slot_number", "product", "capacity", "initial_machine", "archived", "created_at", "updated_at", "deleted_at", "device_id"] }
+    { table: "machine_slots", key: "machineSlots", publicFields: "id,machine_id,slot_number,product,capacity,initial_machine,archived,created_at,updated_at,deleted_at", fields: ["id", "workspace_id", "machine_id", "slot_number", "product", "capacity", "initial_machine", "archived", "created_at", "updated_at", "deleted_at", "device_id"] },
+    { table: "product_storage_rules", key: "productStorageRules", publicFields: "id,product,no_wrap,pack,shelf_per_pack,max_packs,created_at,updated_at,deleted_at", fields: ["id", "workspace_id", "product", "no_wrap", "pack", "shelf_per_pack", "max_packs", "created_at", "updated_at", "deleted_at", "device_id"] }
   ];
   try {
     for (const meta of definitions) {
@@ -2247,7 +2381,7 @@ async function syncMachineConfig(publicOnly) {
     return true;
   } catch (error) {
     const message = String(error?.message || "");
-    if (error?.code === "42P01" || error?.code === "PGRST205" || message.includes("machine_slots") || message.includes("machines")) {
+    if (error?.code === "42P01" || error?.code === "PGRST205" || message.includes("machine_slots") || message.includes("machines") || message.includes("product_storage_rules")) {
       machineSchemaAvailable = false;
       return false;
     }
@@ -2321,10 +2455,11 @@ function renderAuthUI() {
   applyPermissions();
   $("#exportHistoryCsvBtn")?.classList.toggle("hidden", !signedIn);
   renderMachineManager();
+  renderStorageRuleManager();
 }
 
 function ensureSyncView() {
-  if ($(".app-header p")) $(".app-header p").textContent = "V4.1.0 - Ổn định dữ liệu và đồng bộ";
+  if ($(".app-header p")) $(".app-header p").textContent = `V${APP_VERSION} - Hàng tốn chỗ`;
   const cfg = syncConfig();
   $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
   if ($("#syncConfigForm")) { $("#syncConfigForm").url.value = cfg.url || ""; $("#syncConfigForm").key.value = cfg.key || ""; }
@@ -2341,7 +2476,8 @@ function renderOrders() {
     <div class="dashboard-order-head"><div><span>Đơn nhập hàng ${htmlEscape(machine)}</span><b>${packsTotal} thùng</b></div><small>${rows.length} sản phẩm</small></div>
     <div class="dashboard-order-list">${rows.map(row => {
       const layout = row.slotCount > 1 ? `${row.slotCount} slot · sức chứa ${row.capacity}` : `Sức chứa ${row.capacity || "chưa đặt"}`;
-      return `<div class="dashboard-order-row"><span>${htmlEscape(row.product)}<small class="order-context">${layout} · tồn ${row.projected}</small></span><b>${row.pack.packs} thùng</b><small>${row.pack.qty} sản phẩm</small></div>`;
+      const storage = row.storageReason ? ` · ${htmlEscape(row.storageReason)}` : "";
+      return `<div class="dashboard-order-row"><span>${htmlEscape(row.product)}<small class="order-context">${layout} · tồn ${row.projected}${storage}</small></span><b>${row.pack.packs} thùng</b><small>${row.pack.qty} sản phẩm</small></div>`;
     }).join("")}</div>
     <div class="excel-export-box"><div class="excel-export-head"><b>Xuất đơn nhập hàng</b><button type="button" id="selectAllNccMachines" class="mini">Chọn tất cả</button></div>
       <div id="nccExportMachines" class="machine-check-list">${exportMachines.map(name => `<label><input type="checkbox" value="${htmlEscape(name)}" ${name === machine ? "checked" : ""} /><span>${htmlEscape(name)}</span></label>`).join("")}</div>
@@ -2365,12 +2501,12 @@ function exportNccCsv() {
   if (!machines.length) return showToast("Chưa chọn máy để xuất CSV.");
   if (!rows.length) return showToast("Các máy đã chọn chưa có sản phẩm cần nhập.");
   const grouped = groupOrdersByMachine(rows);
-  const csvRows = [["Đơn nhập hàng - Quản Lý Nhập Hàng"], [`Xuất lúc: ${new Date().toLocaleString("vi-VN")}`], [], ["Máy", "Sản phẩm", "Số slot", "Sức chứa", "Tồn cabin", "Tồn dùng tính đơn", "Số thùng", "Quy đổi sản phẩm"]];
+  const csvRows = [["Đơn nhập hàng - Quản Lý Nhập Hàng"], [`Xuất lúc: ${new Date().toLocaleString("vi-VN")}`], [], ["Máy", "Sản phẩm", "Số slot", "Sức chứa", "Tồn cabin", "Tồn dùng tính đơn", "Số thùng", "Quy đổi sản phẩm", "Ghi chú"]];
   machines.forEach(machine => {
-    (grouped[machine] || []).forEach(row => csvRows.push([machine, row.product, row.slotCount, row.capacity, row.qty, row.projected, row.pack.packs, row.pack.qty]));
-    if ((grouped[machine] || []).length) csvRows.push([`Tổng ${machine}`, "", "", "", "", "", totalPacks(grouped[machine]), ""], []);
+    (grouped[machine] || []).forEach(row => csvRows.push([machine, row.product, row.slotCount, row.capacity, row.qty, row.projected, row.pack.packs, row.pack.qty, row.storageReason || ""]));
+    if ((grouped[machine] || []).length) csvRows.push([`Tổng ${machine}`, "", "", "", "", "", totalPacks(grouped[machine]), "", ""], []);
   });
-  csvRows.push(["TỔNG TẤT CẢ", "", "", "", "", "", totalPacks(rows), ""]);
+  csvRows.push(["TỔNG TẤT CẢ", "", "", "", "", "", totalPacks(rows), "", ""]);
   downloadCsvFile(csvRows, `don-nhap-hang-${todayISO()}.csv`);
   showToast(`Đã xuất CSV ${machines.length} máy.`);
 }
@@ -2394,6 +2530,7 @@ function applyPermissions() {
   if (authRequired && !authenticated) activateView("dashboard");
   $("#memberAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#machineAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
+  $("#storageRuleCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
 }
 
@@ -2414,7 +2551,7 @@ function authoritativeState(incomingState) {
     });
     result[key] = [...rows.values()];
   });
-  ["machineConfigs", "machineSlots"].forEach(key => {
+  ["machineConfigs", "machineSlots", "productStorageRules"].forEach(key => {
     const source = incoming[key]?.length ? incoming[key] : state[key];
     result[key] = source.map(item => touchConfigRecord({ ...item }, Boolean(item.deleted_at)));
   });
@@ -2423,7 +2560,9 @@ function authoritativeState(incomingState) {
 
 window.FILL_BASE_CONFIG ||= window.FILL_CONFIG;
 seedMachineConfig();
+seedProductStorageRules();
 refreshOperationalSelects();
 renderMachineManager();
+renderStorageRuleManager();
 renderAll();
 
