@@ -1,4 +1,4 @@
-﻿/* Quản Lý Nhập Hàng V5.2.1 - stocktake.js */
+﻿/* Quản Lý Nhập Hàng V5.2.4 - stocktake.js */
 function stocktakeItems(machine) {
   const cabin = displayCabin();
   const products = new Set(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product));
@@ -66,6 +66,9 @@ function saveStocktakeBatch() {
   renderStocktake();
   showToast(`Đã cập nhật tồn thực tế của ${changes.length} sản phẩm.`);
 }
+
+
+
 
 
 

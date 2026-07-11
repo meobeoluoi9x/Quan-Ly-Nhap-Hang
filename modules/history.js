@@ -1,4 +1,4 @@
-﻿/* Quản Lý Nhập Hàng V5.2.1 - history.js */
+﻿/* Quản Lý Nhập Hàng V5.2.4 - history.js */
 function isTransferRecord(item) {
   return String(item.reason || "").startsWith("Chuyển tồn:");
 }
@@ -134,6 +134,9 @@ function exportHistoryCsv() {
     : [historyDateTime(item), item.machine, item.product, Number(item.actual) - Number(item.qty), item.actual, item.qty]);
   downloadCsvFile([header, ...body], `lich-su-${activeHistoryType}-${todayISO()}.csv`);
 }
+
+
+
 
 
 

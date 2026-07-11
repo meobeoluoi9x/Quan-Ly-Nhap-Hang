@@ -1,5 +1,5 @@
 {
-  "name": "Quản Lý Nhập Hàng V5.2.1",
+  "name": "Quản Lý Nhập Hàng V5.2.4",
   "short_name": "Nhập Hàng",
   "start_url": "./index.html",
   "display": "standalone",
@@ -18,6 +18,9 @@
     }
   ]
 }
+
+
+
 
 
 

@@ -1,4 +1,4 @@
-﻿/* Quản Lý Nhập Hàng V5.2.1 - dashboard.js */
+﻿/* Quản Lý Nhập Hàng V5.2.4 - dashboard.js */
 function renderRoute() {
   $("#todayText").textContent = viDate();
 
@@ -227,5 +227,8 @@ function renderSelectedCabin() {
     return `<div class="compact-info-row ${cls}"><b>${htmlEscape(item.product)}</b><span>${item.qty} ${unitName(item.product)}${htmlEscape(warn)}</span></div>`;
   }).join("") : `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
 }
+
+
+
 
 

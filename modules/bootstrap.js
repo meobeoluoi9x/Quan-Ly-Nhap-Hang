@@ -1,6 +1,6 @@
-﻿/* Quản Lý Nhập Hàng V5.2.1 - bootstrap.js */
+﻿/* Quản Lý Nhập Hàng V5.2.4 - bootstrap.js */
 function bootApp() {
-  if ($(".app-header p")) $(".app-header p").textContent = "V5.2.1 - Tách dashboard";
+  if ($(".app-header p")) $(".app-header p").textContent = "V5.2.4 - Tách dashboard";
   ensureSyncView();
   setupTabs();
   setupForms();
@@ -144,5 +144,8 @@ function bootApp() {
 }
 
 bootApp();
+
+
+
 
 
