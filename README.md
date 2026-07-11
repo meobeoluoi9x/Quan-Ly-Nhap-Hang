@@ -1,6 +1,6 @@
-﻿# Quản Lý Nhập Hàng V5.2.0
+﻿# Quản Lý Nhập Hàng V5.2.1
 
-V5.2.0 giữ logic đặt hàng hiện tại, tiếp tục dọn code và tách dashboard/tồn cabin sang module riêng để app dễ bảo trì hơn.
+V5.2.1 giữ logic đặt hàng hiện tại, tiếp tục dọn code và tách dashboard/tồn cabin sang module riêng để app dễ bảo trì hơn.
 
 Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 
@@ -18,7 +18,7 @@ Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 ## Có gì trong bản này
 
 - Dashboard hoàn chỉnh.
-- Phase 3 V5.2.0 tách dashboard/tồn cabin khỏi `app.js` để giảm độ phình file chính.
+- Phase 3 V5.2.1 tách dashboard/tồn cabin khỏi `app.js` để giảm độ phình file chính.
 - Tổng hợp đặt NCC hiển thị ngay trên Dashboard.
 - Nút Copy đơn NCC.
 - Fill nhanh theo máy.
@@ -395,5 +395,6 @@ Truoc khi dung dong bo V3.5.1, chay lai `sql/supabase_schema.sql` trong Supabase
 ## V3.8.1 - Kiem tra du lieu lech
 
 - Muc cabin am hien Kiem tra trong danh sach chu y thay vi hien so thung can nhap.
+
 
 

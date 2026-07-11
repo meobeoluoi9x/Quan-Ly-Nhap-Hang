@@ -1,4 +1,4 @@
-﻿/* Quản Lý Nhập Hàng V5.2.0 - ncc.js */
+﻿/* Quản Lý Nhập Hàng V5.2.1 - ncc.js */
 function nccProductsForMachine(machine) {
   return unique(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product))
     .sort((a, b) => a.localeCompare(b, "vi"));
@@ -13,8 +13,8 @@ function renderNccProductList() {
   const products = nccProductsForMachine(machine);
   box.innerHTML = products.length ? products.map((product, index) => `
     <div class="bulk-ncc-row ncc-product-card" data-machine="${htmlEscape(machine)}" data-product="${htmlEscape(product)}">
-      <div class="ncc-product-info"><b>${htmlEscape(product)}</b><span>1 thùng = ${productInfo(product).pack} sản phẩm</span></div>
-      <div class="bulk-box-control"><input class="bulk-boxes" type="number" min="0" step="1" inputmode="numeric" placeholder="Số thùng" value="${htmlEscape(values[product] || "")}" data-step="${index}" aria-label="Số thùng ${htmlEscape(product)}" /><small class="bulk-conversion"></small></div>
+      <div class="ncc-product-info"><b>${htmlEscape(product)}</b><span>1 thùng = ${productInfo(product).pack} sản phẩm</span><span class="ncc-product-total"></span></div>
+      <div class="bulk-box-control"><input class="bulk-boxes" type="number" min="0" step="1" inputmode="numeric" placeholder="Số thùng" value="${htmlEscape(values[product] || "")}" data-step="${index}" aria-label="Số thùng ${htmlEscape(product)}" /></div>
       <button type="button" class="clear-ncc-row" data-clear-ncc tabindex="-1" aria-label="Xóa số thùng ${htmlEscape(product)}">×</button>
     </div>`).join("") : `<p class="muted">Máy này chưa có sản phẩm trong layout.</p>`;
   updateNccBatchPreview();
@@ -27,7 +27,8 @@ function updateNccBatchPreview() {
   $$(".ncc-product-card", $("#bulkNccRows")).forEach(row => {
     const qty = Number($(".bulk-boxes", row).value || 0);
     const product = row.dataset.product;
-    if ($(".bulk-conversion", row)) $(".bulk-conversion", row).textContent = `${qty * productInfo(product).pack} sản phẩm`;
+    const total = $(".ncc-product-total", row);
+    if (total) total.textContent = qty > 0 ? `Đã nhập: ${qty} thùng = ${qty * productInfo(product).pack} sản phẩm` : "";
   });
   if ($("#nccBatchPreview")) $("#nccBatchPreview").innerHTML = `
     <div><span>Sản phẩm đã nhập</span><b>${rows.length}</b></div>
@@ -107,5 +108,6 @@ function saveNccBatch(form) {
   resetNccBatch(true);
   showToast(`Đã lưu ${rows.length} sản phẩm NCC.`);
 }
+
 
 

@@ -1,4 +1,4 @@
-﻿/* Quản Lý Nhập Hàng V5.2.0 - fill.js */
+﻿/* Quản Lý Nhập Hàng V5.2.1 - fill.js */
 function quickFillSlotsForMachine(machine) {
   return config().slots.filter(slot => slot.machine === machine)
     .sort((a, b) => Number(a.slot) - Number(b.slot));
@@ -130,4 +130,5 @@ function saveQuickFillBatch() {
   renderQuickFill();
   showToast(`Đã lưu ${entries.length} slot Fill Sản phẩm.`);
 }
+
 

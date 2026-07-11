@@ -352,7 +352,7 @@ main{max-width:1120px;padding:14px}
   .cabin-summary{grid-template-columns:1fr 1fr 1fr}
 }
 
-/* V5.2.0 */
+/* V5.2.1 */
 .operation-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 0 12px;padding:4px;border:1px solid #cbd5e1;border-radius:8px;background:#e2e8f0}
 .operation-tab{min-height:42px;padding:9px 10px;border-radius:6px;background:transparent;color:#334155;font-size:13px}
 .operation-tab.active{background:#0f172a;color:white}
@@ -361,13 +361,13 @@ main{max-width:1120px;padding:14px}
 .quick-fill-list .slot-controls.embedded{display:grid;grid-template-columns:minmax(0,1fr) 38px;gap:7px;align-items:center}
 .quick-fill-list .quick-fill-qty{padding:10px 12px;border-radius:7px;font-size:20px;text-align:center;font-weight:900}
 .quick-fill-list .clear-slot{width:38px;height:38px;padding:0;border-radius:7px;background:#e2e8f0;color:#475569;font-size:20px}
-.ncc-product-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,260px) 38px;gap:10px;align-items:center;padding:10px;border:1px solid #dbe3ee;border-radius:8px;background:#f8fafc}
+.ncc-product-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,320px) 38px;gap:12px;align-items:center;padding:10px;border:1px solid #dbe3ee;border-radius:8px;background:#f8fafc}
 .ncc-product-info b,.ncc-product-info span{display:block}
 .ncc-product-info span{margin-top:3px;color:#64748b;font-size:12px;font-weight:800}
-.ncc-product-card .bulk-boxes{padding:10px 12px;border-radius:7px;font-size:20px;text-align:center;font-weight:900}
+.ncc-product-card .bulk-boxes{width:100%;padding:10px 12px;border-radius:7px;font-size:20px;text-align:center;font-weight:900}
 .ncc-product-card .clear-ncc-row{width:38px;height:38px;padding:0;border-radius:7px;background:#fee2e2;color:#b91c1c;font-size:20px}
 .bulk-box-control{display:grid;gap:3px;min-width:0}
-.bulk-box-control small{color:#64748b;font-size:11px;text-align:center;font-weight:800}
+.ncc-product-total{color:#1d4ed8!important}
 .subview-tabs{display:flex;gap:4px;margin:12px 0;padding:4px;border:1px solid #cbd5e1;border-radius:8px;background:#f1f5f9}
 .subview-tab{flex:1;padding:10px;border-radius:6px;background:transparent;color:#475569}
 .subview-tab.active{background:#0f172a;color:white}
@@ -419,7 +419,7 @@ main{max-width:1120px;padding:14px}
   .quick-fill-footer-actions{grid-template-columns:1fr}
 }
 
-/* V5.2.0 - professional operations UI */
+/* V5.2.1 - professional operations UI */
 :root{
   --bg:#f5f7fb;
   --surface:#ffffff;
@@ -605,7 +605,7 @@ label{color:#334155;font-size:13px;font-weight:900}
   background:#ffffff;
 }
 .batch-preview b,.cabin-summary b{font-size:22px;color:#0f172a}
-.ncc-product-card{grid-template-columns:minmax(0,1fr) minmax(160px,230px) 38px;padding:12px}
+.ncc-product-card{grid-template-columns:minmax(0,1fr) minmax(220px,320px) 38px;padding:12px}
 .ncc-product-info b{font-size:15px;color:#0f172a}
 
 .history-toolbar,.bulk-receive-toolbar,.machine-admin-toolbar,.machine-editor-actions,.duplicate-layout-box{gap:10px}
@@ -660,6 +660,7 @@ label{color:#334155;font-size:13px;font-weight:900}
   .operation-tabs{position:sticky;top:64px;z-index:18}
   .quick-fill-list .slot-card,.ncc-product-card{padding:10px}
   .quick-fill-list .slot-card{grid-template-columns:1fr}
+  .ncc-product-card{grid-template-columns:minmax(0,1fr) minmax(104px,34vw) 38px}
   .quick-fill-footer,.stocktake-actions{bottom:8px}
   .history-row{grid-template-columns:minmax(0,1fr);gap:6px}
   .history-row strong{text-align:left}

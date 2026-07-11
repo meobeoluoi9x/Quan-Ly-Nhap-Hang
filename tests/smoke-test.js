@@ -105,9 +105,9 @@ assert.equal(context.csvCell(-5), `"-5"`);
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
 assert.equal(new Set(ids).size, ids.length, "index.html contains duplicate ids");
-assert.match(html, /Quản Lý Nhập Hàng V5\.2\.0/);
-assert.match(html, /app\.js\?v=5\.2\.0/);
-runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=5\\.2\\.0`)));
+assert.match(html, /Quản Lý Nhập Hàng V5\.2\.1/);
+assert.match(html, /app\.js\?v=5\.2\.1/);
+runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=5\\.2\\.1`)));
 assert.match(html, /id="nccMachine"/);
 assert.match(html, /id="storageRuleForm"/);
 assert.equal((html.match(/data-operation-view=/g) || []).length, 9);
@@ -149,18 +149,21 @@ assert.doesNotMatch(source.match(/function setupSelectsV4Runtime\(\)[\s\S]*?\n\}
 assert.doesNotMatch(extractLastFunction("setupForms"), /bulkNccRows|resetNccBatch|saveNccBatch/);
 assert.doesNotMatch(v42Source, /v42NccStep|nccStepNav|setNccStep|ensureNccStepNav/);
 assert.doesNotMatch(stylesSource, /\.quick-fill-list \.slot-card,\.bulk-ncc-row\{display:none\}/);
-assert.match(stylesSource, /\.ncc-product-card\{display:grid;grid-template-columns:minmax\(0,1fr\) 38px/);
+assert.match(stylesSource, /\.ncc-product-card\{grid-template-columns:minmax\(0,1fr\) minmax\(104px,34vw\) 38px/);
+assert.match(v42Source, /class="ncc-product-total"/);
+assert.doesNotMatch(v42Source, /bulk-conversion/);
 assert.match(stylesSource, /\.storage-rule-row/);
 assert.doesNotMatch(v42Source, /data-add-boxes|data-val=/);
 assert.doesNotMatch(v42Source, /productLayout\(/);
 
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
-assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.2.0");
+assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.2.1");
 const serviceWorker = fs.readFileSync(path.join(root, "sw.js"), "utf8");
-assert.match(serviceWorker, /quan-ly-nhap-hang-v5-2-0/);
+assert.match(serviceWorker, /quan-ly-nhap-hang-v5-2-1/);
 runtimeModules.forEach(name => assert.match(serviceWorker, new RegExp(`\\./modules/${name.replace(".", "\\.")}`)));
 assert.doesNotMatch(extractLastFunctionFromSource(v42Source, "renderHistoryV4Runtime"), /onclick=/);
 assert.doesNotMatch(extractLastFunction("renderAudit"), /onclick=/);
 
-console.log("V5.2.0 smoke tests: PASS");
+console.log("V5.2.1 smoke tests: PASS");
+
 
