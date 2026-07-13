@@ -1,6 +1,6 @@
-﻿# Quản Lý Nhập Hàng V5.2.4
+# Quản Lý Nhập Hàng V5.2.5
 
-V5.2.4 giữ logic đặt hàng hiện tại, tiếp tục dọn code và tách dashboard/tồn cabin sang module riêng để app dễ bảo trì hơn.
+V5.2.5 giữ logic đặt hàng hiện tại, tiếp tục dọn code và tách dashboard/tồn cabin sang module riêng để app dễ bảo trì hơn.
 
 Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 
@@ -18,7 +18,7 @@ Project PWA chuẩn để upload trực tiếp lên GitHub Pages.
 ## Có gì trong bản này
 
 - Dashboard hoàn chỉnh.
-- Phase 3 V5.2.4 tách dashboard/tồn cabin khỏi `app.js` để giảm độ phình file chính.
+- Phase 3 V5.2.5 tách dashboard/tồn cabin khỏi `app.js` để giảm độ phình file chính.
 - Tổng hợp đặt NCC hiển thị ngay trên Dashboard.
 - Nút Copy đơn NCC.
 - Fill nhanh theo máy.

@@ -1,4 +1,4 @@
-﻿/* Quản Lý Nhập Hàng V5.2.4 - ncc.js */
+/* Quản Lý Nhập Hàng V5.2.5 - ncc.js */
 function nccProductsForMachine(machine) {
   return unique(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product))
     .sort((a, b) => a.localeCompare(b, "vi"));

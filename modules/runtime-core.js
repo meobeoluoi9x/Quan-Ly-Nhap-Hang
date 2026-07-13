@@ -1,4 +1,4 @@
-﻿/* Quản Lý Nhập Hàng V5.2.4 - runtime core */
+/* Quản Lý Nhập Hàng V5.2.5 - runtime core */
 const V42_FILL_DRAFT = "qlnh_fill_draft_v42";
 const V42_NCC_DRAFT = "qlnh_ncc_draft_v42";
 const V42_MANAGEMENT = "qlnh_management_v42";
