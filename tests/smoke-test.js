@@ -1,4 +1,4 @@
-﻿const assert = require("node:assert/strict");
+const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
@@ -9,6 +9,7 @@ const runtimeModules = ["order.js", "dashboard.js", "runtime-core.js", "fill.js"
 const v42Source = runtimeModules.map(name => fs.readFileSync(path.join(root, "modules", name), "utf8")).join("\n");
 const orderSource = fs.readFileSync(path.join(root, "modules", "order.js"), "utf8");
 const dashboardSource = fs.readFileSync(path.join(root, "modules", "dashboard.js"), "utf8");
+const runtimeCoreSource = fs.readFileSync(path.join(root, "modules", "runtime-core.js"), "utf8");
 const stylesSource = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 
 const functionNames = [...source.matchAll(/^(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/gm)].map(match => match[1]);
@@ -102,12 +103,28 @@ assert.equal(context.htmlEscape(`<b title='x'>&</b>`), "&lt;b title=&#39;x&#39;&
 assert.equal(context.csvCell("=2+2"), `"'=2+2"`);
 assert.equal(context.csvCell(-5), `"-5"`);
 
+const draftStorage = new Map();
+const draftContext = vm.createContext({
+  todayISO: () => "2026-07-13",
+  localStorage: {
+    getItem: key => draftStorage.get(key) ?? null,
+    removeItem: key => draftStorage.delete(key)
+  }
+});
+["readV42Draft", "isV42DraftFresh", "readFreshV42Draft"]
+  .forEach(name => vm.runInContext(extractLastFunctionFromSource(runtimeCoreSource, name), draftContext));
+draftStorage.set("stale", JSON.stringify({ date: "2026-07-12", savedOn: "2026-07-12" }));
+assert.equal(draftContext.readFreshV42Draft("stale"), null);
+assert.equal(draftStorage.has("stale"), false);
+draftStorage.set("today", JSON.stringify({ date: "2026-07-01", savedOn: "2026-07-13" }));
+assert.equal(draftContext.readFreshV42Draft("today").date, "2026-07-01");
+
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
 assert.equal(new Set(ids).size, ids.length, "index.html contains duplicate ids");
-assert.match(html, /Quản Lý Nhập Hàng V5\.2\.5/);
-assert.match(html, /app\.js\?v=5\.2\.5/);
-runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=5\\.2\\.5`)));
+assert.match(html, /Quản Lý Nhập Hàng V5\.2\.6/);
+assert.match(html, /app\.js\?v=5\.2\.6/);
+runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=5\\.2\\.6`)));
 assert.match(html, /id="nccMachine"/);
 assert.match(html, /id="storageRuleForm"/);
 assert.equal((html.match(/data-operation-view=/g) || []).length, 9);
@@ -143,6 +160,10 @@ assert.match(v42Source, /Đã lưu \$\{rows\.length\} sản phẩm NCC/);
 assert.match(v42Source, /const refreshNccDraft = event => \{/);
 assert.match(v42Source, /function scheduleNccDraft\(\)/);
 assert.match(v42Source, /setTimeout\(persistNccDraft, 180\)/);
+assert.match(v42Source, /savedOn: todayISO\(\)/);
+assert.match(v42Source, /function readFreshV42Draft\(key\)/);
+assert.match(v42Source, /function refreshOperationDatesForNewDay\(\)/);
+assert.match(v42Source, /document\.addEventListener\("visibilitychange"/);
 assert.match(v42Source, /#nccForm.*addEventListener\("submit"/);
 assert.match(v42Source, /#quickMachine.*addEventListener\("change", renderQuickFill\)/);
 assert.doesNotMatch(source.match(/function setupSelectsV4Runtime\(\)[\s\S]*?\n\}/)?.[0] || "", /quickMachine.*addEventListener/);
@@ -161,14 +182,14 @@ assert.doesNotMatch(v42Source, /data-add-boxes|data-val=/);
 assert.doesNotMatch(v42Source, /productLayout\(/);
 
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
-assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.2.5");
+assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.2.6");
 const serviceWorker = fs.readFileSync(path.join(root, "sw.js"), "utf8");
-assert.match(serviceWorker, /quan-ly-nhap-hang-v5-2-5/);
+assert.match(serviceWorker, /quan-ly-nhap-hang-v5-2-6/);
 runtimeModules.forEach(name => assert.match(serviceWorker, new RegExp(`\\./modules/${name.replace(".", "\\.")}`)));
 assert.doesNotMatch(extractLastFunctionFromSource(v42Source, "renderHistoryV4Runtime"), /onclick=/);
 assert.doesNotMatch(extractLastFunction("renderAudit"), /onclick=/);
 
-console.log("V5.2.5 smoke tests: PASS");
+console.log("V5.2.6 smoke tests: PASS");
 
 
 

@@ -1,6 +1,6 @@
-/* Quản Lý Nhập Hàng V5.2.5 - bootstrap.js */
+/* Quản Lý Nhập Hàng V5.2.6 - bootstrap.js */
 function bootApp() {
-  if ($(".app-header p")) $(".app-header p").textContent = "V5.2.5 - Tối ưu thanh lưu trên điện thoại";
+  if ($(".app-header p")) $(".app-header p").textContent = "V5.2.6 - Tự cập nhật ngày hiện tại";
   ensureSyncView();
   setupTabs();
   setupForms();
@@ -13,6 +13,10 @@ function bootApp() {
 
   $("#quickDate")?.addEventListener("change", persistQuickDraft);
   $("#quickMachine")?.addEventListener("change", renderQuickFill);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshOperationDatesForNewDay();
+  });
+  window.addEventListener("focus", refreshOperationDatesForNewDay);
   $$(".operation-tab").forEach(button => button.addEventListener("click", () => activateView(button.dataset.operationView)));
 
   $("#nccForm")?.addEventListener("submit", event => {

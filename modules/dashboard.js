@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.2.5 - dashboard.js */
+/* Quản Lý Nhập Hàng V5.2.6 - dashboard.js */
 function renderRoute() {
   $("#todayText").textContent = viDate();
 

@@ -1,4 +1,4 @@
-const APP_VERSION = "5.2.5";
+const APP_VERSION = "5.2.6";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -1775,7 +1775,7 @@ function renderAuthUI() {
 }
 
 function ensureSyncView() {
-  if ($(".app-header p")) $(".app-header p").textContent = `V${APP_VERSION} - Tối ưu thanh lưu trên điện thoại`;
+  if ($(".app-header p")) $(".app-header p").textContent = `V${APP_VERSION} - Tự cập nhật ngày hiện tại`;
   const cfg = syncConfig();
   $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
   if ($("#syncConfigForm")) { $("#syncConfigForm").url.value = cfg.url || ""; $("#syncConfigForm").key.value = cfg.key || ""; }

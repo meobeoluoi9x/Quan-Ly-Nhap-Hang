@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.2.5 - ncc.js */
+/* Quản Lý Nhập Hàng V5.2.6 - ncc.js */
 function nccProductsForMachine(machine) {
   return unique(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product))
     .sort((a, b) => a.localeCompare(b, "vi"));
@@ -8,7 +8,7 @@ function renderNccProductList() {
   const box = $("#bulkNccRows");
   const machine = $("#nccMachine")?.value;
   if (!box || !machine) return;
-  const draft = readV42Draft(V42_NCC_DRAFT) || {};
+  const draft = readFreshV42Draft(V42_NCC_DRAFT) || {};
   const values = draft.machines?.[machine] || {};
   const products = nccProductsForMachine(machine);
   box.innerHTML = products.length ? products.map((product, index) => `
@@ -46,7 +46,7 @@ function nccDraftRows() {
 function persistNccDraft() {
   const form = $("#nccForm");
   if (!form) return;
-  const draft = readV42Draft(V42_NCC_DRAFT) || { machines: {} };
+  const draft = readFreshV42Draft(V42_NCC_DRAFT) || { machines: {} };
   draft.machines ||= {};
   const rows = nccDraftRows();
   const rowMachine = rows[0]?.machine;
@@ -54,6 +54,7 @@ function persistNccDraft() {
     draft.machines[rowMachine] = Object.fromEntries(rows.map(item => [item.product, item.boxes]));
   }
   draft.date = form.date.value;
+  draft.savedOn = todayISO();
   draft.activeMachine = $("#nccMachine")?.value || rowMachine || "";
   localStorage.setItem(V42_NCC_DRAFT, JSON.stringify(draft));
 }
@@ -76,7 +77,7 @@ function resetNccBatch(clearDraft = false) {
   clearTimeout(v42NccDraftTimer);
   v42NccDraftTimer = 0;
   if (clearDraft) localStorage.removeItem(V42_NCC_DRAFT);
-  const draft = clearDraft ? null : readV42Draft(V42_NCC_DRAFT);
+  const draft = clearDraft ? null : readFreshV42Draft(V42_NCC_DRAFT);
   form.date.value = draft?.date || todayISO();
   const machine = $("#nccMachine");
   machine.innerHTML = machineOptionsHtml(draft?.activeMachine || activeDashboardMachine || "");

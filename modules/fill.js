@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.2.5 - fill.js */
+/* Quản Lý Nhập Hàng V5.2.6 - fill.js */
 function quickFillSlotsForMachine(machine) {
   return config().slots.filter(slot => slot.machine === machine)
     .sort((a, b) => Number(a.slot) - Number(b.slot));
@@ -12,6 +12,7 @@ function persistQuickDraft() {
   localStorage.setItem(V42_FILL_DRAFT, JSON.stringify({
     machine: cards[0].dataset.machine,
     date: $("#quickDate")?.value || todayISO(),
+    savedOn: todayISO(),
     values,
     step: v42FillStep
   }));
@@ -30,7 +31,12 @@ function setQuickStep(index, focus = false) {
 }
 
 function renderQuickFill() {
-  persistQuickDraft();
+  const storedDraft = readV42Draft(V42_FILL_DRAFT);
+  if (!storedDraft || isV42DraftFresh(storedDraft)) persistQuickDraft();
+  else {
+    localStorage.removeItem(V42_FILL_DRAFT);
+    if ($("#quickDate")) $("#quickDate").value = todayISO();
+  }
   const machine = $("#quickMachine")?.value;
   const box = $("#quickFillBox");
   if (!box) return;
@@ -39,7 +45,7 @@ function renderQuickFill() {
     box.innerHTML = `<p class="muted">Máy này chưa có slot.</p>`;
     return;
   }
-  const draft = readV42Draft(V42_FILL_DRAFT);
+  const draft = readFreshV42Draft(V42_FILL_DRAFT);
   const values = draft?.machine === machine ? draft.values || {} : {};
   if (draft?.machine === machine && draft.date) $("#quickDate").value = draft.date;
   v42FillStep = draft?.machine === machine ? Number(draft.step || 0) : 0;

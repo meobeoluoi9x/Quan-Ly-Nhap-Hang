@@ -1,11 +1,11 @@
-# TEST REPORT - Quan Ly Nhap Hang V5.2.5
+# TEST REPORT - Quan Ly Nhap Hang V5.2.6
 
 - PASS: `app.js` and all runtime modules syntax check.
 - PASS: `tests/smoke-test.js`.
-- PASS: local server returns HTTP 200 for `index.html?v=5.2.5`.
+- PASS: local server returns HTTP 200 for `index.html?v=5.2.6`.
 - PASS: no duplicate function declarations in `app.js`.
 - PASS: no duplicate IDs in `index.html`.
-- PASS: service worker cache and manifest are on V5.2.5.
+- PASS: service worker cache and manifest are on V5.2.6.
 - PASS: dashboard and cabin rendering moved to `modules/dashboard.js`.
 - PASS: Nhap Hang NCC conversion moves under product name and the box input is wider.
 - PASS: Fill San pham and Nhap Hang NCC runtime no longer contain `+1`, `+2`, `+3`, `+5` handlers.
