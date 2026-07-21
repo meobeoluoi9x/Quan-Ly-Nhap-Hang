@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.9 - transfer.js */
+/* Quản Lý Nhập Hàng V5.4.10 - transfer.js */
 function transferProducts(machine) {
   const products = new Set(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product));
   Object.keys(currentCabin()).forEach(key => {

@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.9 - fill.js */
+/* Quản Lý Nhập Hàng V5.4.10 - fill.js */
 function quickFillSlotsForMachine(machine) {
   return config().slots.filter(slot => slot.machine === machine)
     .sort((a, b) => Number(a.slot) - Number(b.slot));
@@ -67,13 +67,19 @@ function renderQuickFill() {
   box.oninput = event => {
     if (event.target.matches(".quick-fill-qty")) { updateQuickFillPending(); persistQuickDraft(); }
   };
+  box.onfocusin = event => {
+    if (!event.target.matches(".quick-fill-qty")) return;
+    const step = Number(event.target.dataset.step || 0);
+    if (Number.isFinite(step) && step !== v42FillStep) setQuickStep(step);
+  };
   box.onkeydown = event => {
     if (!event.target.matches(".quick-fill-qty") || event.key !== "Tab") return;
+    if (event.repeat) return;
     event.preventDefault();
     const inputs = $$(".quick-fill-qty", box);
     const index = inputs.indexOf(event.target);
-    const next = event.shiftKey ? inputs[index - 1] : inputs[index + 1];
-    if (next) next.focus();
+    const nextIndex = event.shiftKey ? index - 1 : index + 1;
+    if (inputs[nextIndex]) setQuickStep(nextIndex, true);
     else (event.shiftKey ? $("#quickMachine") : $("#saveQuickFillBtn"))?.focus();
   };
   box.onclick = event => {

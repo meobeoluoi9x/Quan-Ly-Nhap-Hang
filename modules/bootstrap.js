@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.9 - bootstrap.js */
+/* Quản Lý Nhập Hàng V5.4.10 - bootstrap.js */
 function bootApp() {
   applyDisplaySettings();
   ensureSyncView();
@@ -40,6 +40,7 @@ function bootApp() {
   });
   $("#bulkNccRows")?.addEventListener("keydown", event => {
     if (!event.target.matches(".bulk-boxes") || event.key !== "Tab") return;
+    if (event.repeat) return;
     event.preventDefault();
     const inputs = $$(".bulk-boxes", $("#bulkNccRows"));
     const index = inputs.indexOf(event.target);
