@@ -1,6 +1,5 @@
-/* Quản Lý Nhập Hàng V5.2.6 - ui.js */
+/* Quản Lý Nhập Hàng V5.4.2 - ui.js */
 function activateCabinSubview(name) {
-  if (name === "transfer" && !hasPermission("stocktake")) return;
   $$("[data-cabin-view]").forEach(button => button.classList.toggle("active", button.dataset.cabinView === name));
   $$("[data-cabin-panel]").forEach(panel => {
     const active = panel.dataset.cabinPanel === name;
@@ -16,10 +15,12 @@ function applyManagementView() {
   const canManage = hasPermission("manage");
   const layoutOption = select.querySelector('option[value="layout"]');
   const storageOption = select.querySelector('option[value="storage"]');
+  const displayOption = select.querySelector('option[value="display"]');
   if (layoutOption) layoutOption.disabled = !canManage;
   if (storageOption) storageOption.disabled = !canManage;
+  if (displayOption) displayOption.disabled = !canManage;
   let value = select.value || localStorage.getItem(V42_MANAGEMENT) || "account";
-  if ((value === "layout" || value === "storage") && !canManage) value = "account";
+  if ((value === "layout" || value === "storage" || value === "display") && !canManage) value = "account";
   select.value = value;
   localStorage.setItem(V42_MANAGEMENT, value);
   $$(".management-panel").forEach(panel => {
@@ -27,22 +28,20 @@ function applyManagementView() {
     panel.classList.toggle("management-hidden", panel.dataset.managementPanel !== value || (adminPanel && !canManage));
   });
   if (value === "storage" && canManage) renderStorageRuleManager();
+  if (value === "display" && canManage) applyDisplaySettings();
 }
 
 function activateView(name) {
   const operationViews = ["quickfill", "ncc", "cabin"];
   if (name === "operations") {
     const saved = localStorage.getItem("qlnh_operation_view_v42") || "quickfill";
-    name = saved === "quickfill" && hasPermission("fill") ? saved
-      : saved === "ncc" && hasPermission("receive") ? saved
-      : "cabin";
+    name = ["quickfill", "ncc", "cabin"].includes(saved) ? saved : "quickfill";
   }
   const requestedTab = $(`.tab[data-view="${name}"]`) || $(`[data-operation-view="${name}"]`);
   if (requestedTab?.dataset.authRequired && !(syncUser || syncAccess)) {
     openAuthModal();
     return;
   }
-  if (requestedTab?.dataset.permission && !requirePermission(requestedTab.dataset.permission)) return;
   $$(".tab").forEach(tab => {
     const active = operationViews.includes(name) ? tab.classList.contains("operation-menu-tab") : tab.dataset.view === name;
     tab.classList.toggle("active", active);
@@ -90,17 +89,14 @@ function showProductMenu(combo) {
 function applyPermissions() {
   const authenticated = Boolean(syncUser && syncAccess);
   $$('[data-auth-required]').forEach(element => element.classList.toggle("hidden", !authenticated));
-  $$('[data-permission]').forEach(element => element.classList.toggle("hidden", !hasPermission(element.dataset.permission)));
-  const restricted = $(".tab.active[data-permission]");
-  if (restricted && !hasPermission(restricted.dataset.permission)) activateView("dashboard");
   const authRequired = $(".tab.active[data-auth-required]");
   if (authRequired && !authenticated) activateView("dashboard");
   $("#memberAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#machineAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#storageRuleCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
-  if ($("#quickfill")?.classList.contains("active") && !hasPermission("fill")) activateView("cabin");
-  if ($("#ncc")?.classList.contains("active") && !hasPermission("receive")) activateView("cabin");
+  $("#exportHistoryXlsxBtn")?.classList.toggle("hidden", !authenticated);
+  $("#historyExportBox")?.classList.toggle("hidden", !authenticated);
   applyManagementView();
 }
 
@@ -113,6 +109,7 @@ function renderAll() {
   renderStorageRuleManager();
   applyManagementView();
 }
+
 
 
 

@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.2.6 - transfer.js */
+/* Quản Lý Nhập Hàng V5.4.2 - transfer.js */
 function transferProducts(machine) {
   const products = new Set(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product));
   Object.keys(currentCabin()).forEach(key => {
@@ -86,6 +86,8 @@ function saveTransfer() {
     return !layout.slotCount || (layout.capacity > 0 && destination + item.qty > layout.capacity);
   });
   if (warnings.length && !confirm(`${warnings.length} sản phẩm chưa có slot hoặc vượt sức chứa máy nhận. Vẫn chuyển?`)) return;
+  const total = rows.reduce((sum, item) => sum + item.qty, 0);
+  if (!confirm(`Lưu phiếu chuyển ${rows.length} sản phẩm, tổng ${total} sản phẩm từ ${from} sang ${to}?`)) return;
   const batchId = makeId();
   const date = $("#transferDate").value || todayISO();
   const recordedAt = new Date().toISOString();
@@ -99,6 +101,7 @@ function saveTransfer() {
   resetTransfer();
   showToast(`Đã chuyển ${rows.length} sản phẩm từ ${from} sang ${to}.`);
 }
+
 
 
 

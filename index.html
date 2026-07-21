@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Quản Lý Nhập Hàng V5.2.6</title>
-  <link rel="manifest" href="manifest.json?v=5.2.6" />
-  <link rel="stylesheet" href="styles.css?v=5.2.6" />
+  <title>Quản Lý Nhập Hàng V5.4.2</title>
+  <link rel="manifest" href="manifest.json?v=5.4.2" />
+  <link rel="stylesheet" href="styles.css?v=5.4.2" />
 </head>
 <body>
   <div class="app">
@@ -14,7 +14,7 @@
       <button id="menuToggle" class="icon-btn" type="button" aria-label="Mở menu" aria-controls="sideNav" aria-expanded="false">&#9776;</button>
       <div class="app-brand">
         <h1>Quản Lý Nhập Hàng</h1>
-        <p>V5.2.6 - Tự cập nhật ngày hiện tại</p>
+        <p>V5.4.2 - Xuất Excel và phân quyền xem</p>
       </div>
       <button id="syncBadge" class="sync-badge" type="button">Local</button>
       <button id="accountBtn" class="account-btn" type="button" aria-label="Tài khoản">Đăng nhập</button>
@@ -30,7 +30,7 @@
       <button class="tab active" data-view="dashboard">Dashboard</button>
       <button class="tab operation-menu-tab" data-view="operations">Vận hành</button>
       <button class="tab" data-view="history">Lịch sử</button>
-      <button class="tab" data-view="audit" data-permission="stocktake">Kiểm tra</button>
+      <button class="tab" data-view="audit">Kiểm tra</button>
       <button class="tab" data-view="system" data-auth-required="true">Quản lý</button>
     </nav>
 
@@ -122,7 +122,7 @@
           <section class="cabin-subview active" data-cabin-panel="inventory">
             <div class="cabin-toolbar">
               <label>Máy <select id="cabinMachine"></select></label>
-              <button id="exportCabinCsvBtn" type="button" class="btn primary">Xuất CSV</button>
+              <button id="exportCabinXlsxBtn" type="button" class="btn primary">Xuất Excel</button>
             </div>
             <div id="cabinSummary" class="cabin-summary"></div>
             <div id="cabinBox"></div>
@@ -166,7 +166,11 @@
               <button type="button" class="mini" data-history-days="7">7 ngày</button>
               <button type="button" class="mini" data-history-days="30">30 ngày</button>
             </div>
-            <button id="exportHistoryCsvBtn" type="button" class="btn primary hidden">Xuất CSV</button>
+            <button id="exportHistoryXlsxBtn" type="button" class="btn primary hidden">Xuất Excel</button>
+          </div>
+          <div id="historyExportBox" class="history-export-box hidden">
+            <div class="excel-export-head"><b>Máy xuất Excel</b><button type="button" id="selectAllHistoryMachines" class="mini">Chọn tất cả</button></div>
+            <div id="historyExportMachines" class="machine-check-list"></div>
           </div>
           <div id="historyList"></div>
         </article>
@@ -192,6 +196,8 @@
               <option value="account">Tài khoản và phân quyền</option>
               <option value="layout">Thay đổi layout</option>
               <option value="storage">Hàng tốn chỗ</option>
+              <option value="display">Hiển thị app</option>
+              <option value="updates">Cập nhật phiên bản</option>
               <option value="sync">Đồng bộ dữ liệu</option>
               <option value="backup">Sao lưu và khôi phục</option>
             </select>
@@ -220,6 +226,26 @@
           <div class="button-row">
             <button id="exportBtn" class="btn primary">Xuất dữ liệu JSON</button>
             <label class="file-btn" data-permission="manage">Nhập dữ liệu JSON<input id="importInput" type="file" accept="application/json" /></label>
+          </div>
+        </article>
+        <article class="card management-panel" data-management-panel="display">
+          <div class="section-head"><h2>Hiển thị app</h2><span class="hint">Chỉ đổi chữ trên giao diện</span></div>
+          <form id="displaySettingsForm">
+            <label>Tên app <input name="title" type="text" maxlength="60" required /></label>
+            <label>Phiên bản hiển thị <input name="version" type="text" maxlength="20" placeholder="V5.4.2" /></label>
+            <label>Ghi chú phiên bản <input name="note" type="text" maxlength="80" placeholder="Xuất Excel và phân quyền xem" /></label>
+            <button type="submit" class="btn primary">Lưu hiển thị</button>
+          </form>
+          <p class="muted">Phiên bản cache kỹ thuật vẫn do code quản lý để tránh lỗi cập nhật app.</p>
+        </article>
+        <article class="card management-panel" data-management-panel="updates">
+          <div class="section-head"><h2>Cập nhật phiên bản</h2><span class="hint">V5.4.2</span></div>
+          <div class="version-notes">
+            <div><b>V5.4.2 - Xác nhận trước khi lưu/xóa</b><span>Thêm hộp xác nhận cho lưu Fill, NCC, kiểm kê, chuyển tồn và thao tác xóa nhanh dữ liệu đang nhập để giảm bấm nhầm.</span></div>
+            <div><b>V5.4.1 - Tổng hợp Excel theo sheet máy</b><span>Nhập tồn trong máy ở từng sheet máy, sheet Tổng hợp tự lấy số liệu bằng công thức để đối chiếu cuối tháng.</span></div>
+            <div><b>V5.3.3 - Lịch sử theo slot</b><span>Sắp xếp máy theo layout, thêm cột Slot và Tồn trong máy cho sheet Tổng hợp lịch sử Fill.</span></div>
+            <div><b>V5.3.2 - Chọn máy xuất lịch sử</b><span>Đăng nhập mới được xuất Excel, có thể tick nhiều máy khi xuất lịch sử.</span></div>
+            <div><b>V5.3.1 - Sửa cache local</b><span>Localhost tự gỡ service worker/cache cũ để tránh kẹt phiên bản khi test.</span></div>
           </div>
         </article>
         <article id="memberAdminCard" class="card management-panel hidden" data-management-panel="account">
@@ -299,20 +325,22 @@
       </div>
     </section>
   </div>
-  <script src="data.js?v=5.2.6"></script>
-  <script src="modules/order.js?v=5.2.6"></script>
-  <script src="app.js?v=5.2.6"></script>
-  <script src="modules/dashboard.js?v=5.2.6"></script>
-  <script src="modules/runtime-core.js?v=5.2.6"></script>
-  <script src="modules/fill.js?v=5.2.6"></script>
-  <script src="modules/ncc.js?v=5.2.6"></script>
-  <script src="modules/stocktake.js?v=5.2.6"></script>
-  <script src="modules/transfer.js?v=5.2.6"></script>
-  <script src="modules/history.js?v=5.2.6"></script>
-  <script src="modules/ui.js?v=5.2.6"></script>
-  <script src="modules/bootstrap.js?v=5.2.6"></script>
+  <script src="data.js?v=5.4.2"></script>
+  <script src="modules/order.js?v=5.4.2"></script>
+  <script src="app.js?v=5.4.2"></script>
+  <script src="modules/dashboard.js?v=5.4.2"></script>
+  <script src="modules/runtime-core.js?v=5.4.2"></script>
+  <script src="modules/xlsx.js?v=5.4.2"></script>
+  <script src="modules/fill.js?v=5.4.2"></script>
+  <script src="modules/ncc.js?v=5.4.2"></script>
+  <script src="modules/stocktake.js?v=5.4.2"></script>
+  <script src="modules/transfer.js?v=5.4.2"></script>
+  <script src="modules/history.js?v=5.4.2"></script>
+  <script src="modules/ui.js?v=5.4.2"></script>
+  <script src="modules/bootstrap.js?v=5.4.2"></script>
 </body>
 </html>
+
 
 
 

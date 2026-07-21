@@ -1,7 +1,8 @@
-/* Quản Lý Nhập Hàng V5.2.6 - runtime core */
+/* Quản Lý Nhập Hàng V5.4.2 - runtime core */
 const V42_FILL_DRAFT = "qlnh_fill_draft_v42";
 const V42_NCC_DRAFT = "qlnh_ncc_draft_v42";
 const V42_MANAGEMENT = "qlnh_management_v42";
+const V53_DISPLAY = "qlnh_display_v53";
 let v42FillStep = 0;
 let v42NccDraftTimer = 0;
 let v42HistoryPage = 1;
@@ -39,6 +40,42 @@ function refreshOperationDatesForNewDay() {
   persistQuickDraft();
   persistNccDraft();
 }
+
+function displaySettings() {
+  const fallback = {
+    title: "Quản Lý Nhập Hàng",
+    version: `V${APP_VERSION}`,
+    note: "Tự cập nhật ngày hiện tại"
+  };
+  try {
+    return { ...fallback, ...(JSON.parse(localStorage.getItem(V53_DISPLAY) || "null") || {}) };
+  } catch {
+    return fallback;
+  }
+}
+
+function saveDisplaySettings(settings) {
+  localStorage.setItem(V53_DISPLAY, JSON.stringify(settings));
+  applyDisplaySettings();
+}
+
+function displaySubtitle(settings = displaySettings()) {
+  return [settings.version, settings.note].filter(Boolean).join(" - ");
+}
+
+function applyDisplaySettings() {
+  const settings = displaySettings();
+  if ($(".app-brand h1")) $(".app-brand h1").textContent = settings.title || "Quản Lý Nhập Hàng";
+  if ($(".app-header p")) $(".app-header p").textContent = displaySubtitle(settings);
+  document.title = `${settings.title || "Quản Lý Nhập Hàng"} ${settings.version || ""}`.trim();
+  const form = $("#displaySettingsForm");
+  if (form) {
+    form.title.value = settings.title || "";
+    form.version.value = settings.version || "";
+    form.note.value = settings.note || "";
+  }
+}
+
 
 
 

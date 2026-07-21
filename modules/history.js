@@ -1,9 +1,10 @@
-/* Quản Lý Nhập Hàng V5.2.6 - history.js */
+/* Quản Lý Nhập Hàng V5.4.2 - history.js */
 function isTransferRecord(item) {
   return String(item.reason || "").startsWith("Chuyển tồn:");
 }
 
-function historyRowsV42() {
+function historyRowsV42(options = {}) {
+  const useMachineFilter = options.machineFilter !== false;
   const key = activeHistoryType === "fill" ? "fillLogs" : activeHistoryType === "ncc" ? "nccLogs" : "adjustLogs";
   const from = $("#historyDate")?.value || "";
   const to = $("#historyToDate")?.value || "";
@@ -13,13 +14,27 @@ function historyRowsV42() {
     .filter(item => activeHistoryType === "transfer" ? isTransferRecord(item) : activeHistoryType === "adjust" ? !isTransferRecord(item) : true)
     .filter(item => (!from || item.date >= from) && (!to || item.date <= to)
       && (!query || String(item.product).toLocaleLowerCase("vi").includes(query)))
-  if (machine && activeHistoryType === "transfer") {
+  if (useMachineFilter && machine && activeHistoryType === "transfer") {
     const batches = new Set(rows.filter(item => canonicalMachineName(item.machine) === machine).map(item => item.batch_id || item.id));
     rows = rows.filter(item => batches.has(item.batch_id || item.id));
-  } else if (machine) {
+  } else if (useMachineFilter && machine) {
     rows = rows.filter(item => canonicalMachineName(item.machine) === machine);
   }
   return rows.sort((a, b) => String(b.recorded_at || b.date).localeCompare(String(a.recorded_at || a.date)));
+}
+
+function renderHistoryExportMachines() {
+  const box = $("#historyExportMachines");
+  if (!box) return;
+  const current = $("#historyMachine")?.value || "";
+  box.innerHTML = config().machines.map(machine => {
+    const checked = !current || canonicalMachineName(machine.name) === current;
+    return `<label><input type="checkbox" value="${htmlEscape(machine.name)}" ${checked ? "checked" : ""} /><span>${htmlEscape(machine.name)}</span></label>`;
+  }).join("");
+}
+
+function selectedHistoryExportMachines() {
+  return $$("#historyExportMachines input:checked").map(input => canonicalMachineName(input.value));
 }
 
 function transferHistoryBatches() {
@@ -60,6 +75,7 @@ function historyPaginationHtml(total) {
 function renderHistoryV4Runtime() {
   const list = $("#historyList");
   if (!list) return;
+  renderHistoryExportMachines();
   refreshHistoryLimitContext();
   if (activeHistoryType === "transfer") {
     const batches = transferHistoryBatches();
@@ -109,31 +125,6 @@ function deleteTransferBatch(batchId) {
   showToast("Đã xóa phiếu chuyển và hoàn lại tồn.");
 }
 
-function exportHistoryCsv() {
-  if (!syncUser) return showToast("Cần đăng nhập để xuất CSV.");
-  if (activeHistoryType === "transfer") {
-    const rows = [["Ngày giờ", "Máy nguồn", "Máy nhận", "Sản phẩm", "Số lượng"]];
-    transferHistoryBatches().forEach(batch => {
-      const outgoing = batch.items.filter(item => Number(item.qty) < 0);
-      const incoming = batch.items.filter(item => Number(item.qty) > 0);
-      outgoing.forEach(item => rows.push([
-        historyDateTime(batch.sample), item.machine,
-        incoming.find(row => row.product === item.product)?.machine || "",
-        item.product, Math.abs(Number(item.qty))
-      ]));
-    });
-    downloadCsvFile(rows, `lich-su-chuyen-ton-${todayISO()}.csv`);
-    return;
-  }
-  const rows = historyRowsV42();
-  const header = activeHistoryType === "fill" ? ["Ngày giờ", "Máy", "Slot", "Sản phẩm", "Số lượng"]
-    : activeHistoryType === "ncc" ? ["Ngày giờ", "Máy", "Sản phẩm", "Thùng", "Quy đổi sản phẩm"]
-    : ["Ngày giờ", "Máy", "Sản phẩm", "Tồn cũ", "Tồn thực tế", "Chênh lệch"];
-  const body = rows.map(item => activeHistoryType === "fill" ? [historyDateTime(item), item.machine, item.slot || "", item.product, item.qty]
-    : activeHistoryType === "ncc" ? [historyDateTime(item), item.machine, item.product, nccBoxes(item), item.qty]
-    : [historyDateTime(item), item.machine, item.product, Number(item.actual) - Number(item.qty), item.actual, item.qty]);
-  downloadCsvFile([header, ...body], `lich-su-${activeHistoryType}-${todayISO()}.csv`);
-}
 
 
 

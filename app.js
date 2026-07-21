@@ -1,4 +1,4 @@
-const APP_VERSION = "5.2.6";
+const APP_VERSION = "5.4.2";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -315,6 +315,7 @@ function setupSelectsV4Runtime() {
   if ($("#quickMachine")) $("#quickMachine").innerHTML = machines;
   if ($("#stocktakeMachine")) $("#stocktakeMachine").innerHTML = machines;
   if ($("#historyMachine")) $("#historyMachine").innerHTML = `<option value="">Tất cả</option>${machines}`;
+  renderHistoryExportMachines();
   const from = new Date();
   from.setDate(from.getDate() - 6);
   if ($("#historyDate")) $("#historyDate").value = localISODate(from);
@@ -325,7 +326,7 @@ function setupSelectsV4Runtime() {
     localStorage.setItem("fill_assistant_cabin_machine", activeCabinMachine);
     renderCabin();
   });
-  $("#exportCabinCsvBtn")?.addEventListener("click", exportCabinCsv);
+  $("#exportCabinXlsxBtn")?.addEventListener("click", exportCabinXlsx);
 }
 
 function localISODate(date) {
@@ -1145,7 +1146,13 @@ $("#installBtn")?.addEventListener("click", async () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js");
+  const isLocalPreview = ["127.0.0.1", "localhost", "::1"].includes(location.hostname);
+  if (!isLocalPreview) {
+    navigator.serviceWorker.register("./sw.js");
+  } else {
+    navigator.serviceWorker.getRegistrations?.().then(registrations => registrations.forEach(registration => registration.unregister()));
+    caches?.keys?.().then(keys => keys.forEach(key => caches.delete(key)));
+  }
 }
 
 /* V4.1.0 - Quản Lý Nhập Hàng */
@@ -1318,7 +1325,7 @@ function setupForms() {
     $("#" + id)?.addEventListener(id === "historyProduct" ? "input" : "change", renderHistory);
   });
   $$("[data-history-days]").forEach(button => button.addEventListener("click", () => setHistoryRange(Number(button.dataset.historyDays))));
-  $("#exportHistoryCsvBtn")?.addEventListener("click", exportHistoryCsv);
+  $("#exportHistoryXlsxBtn")?.addEventListener("click", exportHistoryXlsx);
   $("#resetBtn")?.addEventListener("click", async () => {
     if (!requirePermission("manage")) return;
     if (!confirm("Reset về dữ liệu gốc trên thiết bị và Supabase?")) return;
@@ -1493,6 +1500,7 @@ function refreshOperationalSelects() {
   if ($("#quickMachine")) { $("#quickMachine").innerHTML = options; if (preserve.quick) $("#quickMachine").value = canonicalMachineName(preserve.quick); }
   if ($("#stocktakeMachine")) { $("#stocktakeMachine").innerHTML = options; if (preserve.stocktake) $("#stocktakeMachine").value = canonicalMachineName(preserve.stocktake); }
   if ($("#historyMachine")) { $("#historyMachine").innerHTML = `<option value="">Tất cả</option>${options}`; $("#historyMachine").value = preserve.history || ""; }
+  renderHistoryExportMachines();
   $$(".bulk-machine").forEach(select => { const value = select.value; select.innerHTML = machineOptionsHtml(value); });
 }
 
@@ -1769,13 +1777,14 @@ function renderAuthUI() {
     $("#accountBtn").title = signedIn ? syncUser.email : "Đăng nhập";
   }
   applyPermissions();
-  $("#exportHistoryCsvBtn")?.classList.toggle("hidden", !signedIn);
+  $("#exportHistoryXlsxBtn")?.classList.toggle("hidden", !signedIn);
+  $("#historyExportBox")?.classList.toggle("hidden", !signedIn);
   renderMachineManager();
   renderStorageRuleManager();
 }
 
 function ensureSyncView() {
-  if ($(".app-header p")) $(".app-header p").textContent = `V${APP_VERSION} - Tự cập nhật ngày hiện tại`;
+  applyDisplaySettings();
   const cfg = syncConfig();
   $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
   if ($("#syncConfigForm")) { $("#syncConfigForm").url.value = cfg.url || ""; $("#syncConfigForm").key.value = cfg.key || ""; }
@@ -1797,34 +1806,18 @@ function renderOrders() {
     }).join("")}</div>
     <div class="excel-export-box"><div class="excel-export-head"><b>Xuất đơn nhập hàng</b><button type="button" id="selectAllNccMachines" class="mini">Chọn tất cả</button></div>
       <div id="nccExportMachines" class="machine-check-list">${exportMachines.map(name => `<label><input type="checkbox" value="${htmlEscape(name)}" ${name === machine ? "checked" : ""} /><span>${htmlEscape(name)}</span></label>`).join("")}</div>
-      <button type="button" id="exportNccCsvBtn" class="btn primary">Xuất CSV mở bằng Excel</button></div>`
+      <button type="button" id="exportNccXlsxBtn" class="btn primary">Xuất Excel</button></div>`
     : `<div class="empty-state"><b>${htmlEscape(machine || "Máy này")} đang ổn</b><span>Chưa có sản phẩm nào cần nhập hàng.</span></div>`;
   $("#orderBox").innerHTML = attention.length ? `<div class="attention-list">${attention.slice(0, 12).map(item => {
     const level = item.raw < 0 ? "red" : item.qty <= 2 ? "red" : item.qty <= 12 ? "yellow" : "blue";
     return `<div class="attention-row ${level}"><div><b>${htmlEscape(item.product)}</b><span>${item.raw < 0 ? `Lệch ${Math.abs(item.raw)}` : `Tồn ${item.qty}`} sản phẩm</span></div><strong>${item.order > 0 ? `${item.pack.packs} thùng` : "Kiểm tra"}</strong></div>`;
   }).join("")}</div>` : `<div class="empty-state"><b>Không có tồn thấp</b><span>Máy này chưa có mục nào cần chú ý.</span></div>`;
-  $("#exportNccCsvBtn")?.addEventListener("click", exportNccCsv);
+  $("#exportNccXlsxBtn")?.addEventListener("click", exportNccXlsx);
   $("#selectAllNccMachines")?.addEventListener("click", () => {
     const inputs = $$("#nccExportMachines input");
     const check = inputs.some(input => !input.checked);
     inputs.forEach(input => { input.checked = check; });
   });
-}
-
-function exportNccCsv() {
-  const machines = selectedNccExportMachines();
-  const rows = buildOrderRows().filter(row => machines.includes(row.machine));
-  if (!machines.length) return showToast("Chưa chọn máy để xuất CSV.");
-  if (!rows.length) return showToast("Các máy đã chọn chưa có sản phẩm cần nhập.");
-  const grouped = groupOrdersByMachine(rows);
-  const csvRows = [["Đơn nhập hàng - Quản Lý Nhập Hàng"], [`Xuất lúc: ${new Date().toLocaleString("vi-VN")}`], [], ["Máy", "Sản phẩm", "Số slot", "Sức chứa", "Tồn cabin", "Tồn dùng tính đơn", "Số thùng", "Quy đổi sản phẩm", "Ghi chú"]];
-  machines.forEach(machine => {
-    (grouped[machine] || []).forEach(row => csvRows.push([machine, row.product, row.slotCount, row.capacity, row.qty, row.projected, row.pack.packs, row.pack.qty, row.storageReason || ""]));
-    if ((grouped[machine] || []).length) csvRows.push([`Tổng ${machine}`, "", "", "", "", "", totalPacks(grouped[machine]), "", ""], []);
-  });
-  csvRows.push(["TỔNG TẤT CẢ", "", "", "", "", "", totalPacks(rows), "", ""]);
-  downloadCsvFile(csvRows, `don-nhap-hang-${todayISO()}.csv`);
-  showToast(`Đã xuất CSV ${machines.length} máy.`);
 }
 
 function exportJSON() {
@@ -1839,15 +1832,14 @@ function exportJSON() {
 function applyPermissions() {
   const authenticated = Boolean(syncUser && syncAccess);
   $$('[data-auth-required]').forEach(element => element.classList.toggle("hidden", !authenticated));
-  $$('[data-permission]').forEach(element => element.classList.toggle("hidden", !hasPermission(element.dataset.permission)));
-  const restricted = $(".tab.active[data-permission]");
-  if (restricted && !hasPermission(restricted.dataset.permission)) activateView("dashboard");
   const authRequired = $(".tab.active[data-auth-required]");
   if (authRequired && !authenticated) activateView("dashboard");
   $("#memberAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#machineAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#storageRuleCard")?.classList.toggle("hidden", !hasPermission("manage"));
   $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
+  $("#exportHistoryXlsxBtn")?.classList.toggle("hidden", !authenticated);
+  $("#historyExportBox")?.classList.toggle("hidden", !authenticated);
 }
 
 function authoritativeState(incomingState) {
@@ -1873,6 +1865,7 @@ function authoritativeState(incomingState) {
   });
   return result;
 }
+
 
 
 

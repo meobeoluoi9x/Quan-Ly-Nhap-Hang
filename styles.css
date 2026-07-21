@@ -36,6 +36,7 @@
 .history-filters{grid-template-columns:repeat(4,minmax(150px,1fr))}
 .history-toolbar{margin:10px 0 14px;align-items:center}
 .history-toolbar .btn,.machine-editor-actions .btn{width:auto}
+.history-export-box{margin:0 0 14px;padding:10px;border:1px solid #dbe3ee;border-radius:8px;background:#f8fafc}
 .bulk-receive-toolbar .btn.ghost,.machine-admin-toolbar .btn.ghost,.duplicate-layout-box .btn.ghost,.section-head.compact .btn.ghost{color:#0f172a;background:#fff}
 .history-presets{display:flex;gap:6px;flex-wrap:wrap}
 .history-day{margin:18px 0 8px;padding-bottom:6px;border-bottom:1px solid #cbd5e1;font-size:14px;color:#334155}
@@ -352,7 +353,7 @@ main{max-width:1120px;padding:14px}
   .cabin-summary{grid-template-columns:1fr 1fr 1fr}
 }
 
-/* V5.2.6 */
+/* V5.4.2 */
 .operation-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 0 12px;padding:4px;border:1px solid #cbd5e1;border-radius:8px;background:#e2e8f0}
 .operation-tab{min-height:42px;padding:9px 10px;border-radius:6px;background:transparent;color:#334155;font-size:13px}
 .operation-tab.active{background:#0f172a;color:white}
@@ -382,6 +383,10 @@ main{max-width:1120px;padding:14px}
 .transfer-preview span,.stocktake-preview span{display:block}
 .stocktake-preview strong{margin-left:6px}
 .stocktake-preview .positive{color:#15803d}.stocktake-preview .negative{color:#dc2626}
+.version-notes{display:grid;gap:10px}
+.version-notes>div{padding:12px;border:1px solid #dbe3ee;border-radius:8px;background:#f8fafc}
+.version-notes b,.version-notes span{display:block}
+.version-notes span{margin-top:4px;color:#475569;font-size:13px;font-weight:800;line-height:1.45}
 .management-picker-card{padding:12px}
 .management-picker-card label{grid-template-columns:minmax(150px,220px) minmax(220px,1fr);align-items:center}
 .management-picker-card select{border-radius:7px;padding:10px}
@@ -420,7 +425,7 @@ main{max-width:1120px;padding:14px}
   .quick-fill-footer-actions{grid-template-columns:1fr}
 }
 
-/* V5.2.6 - professional operations UI */
+/* V5.4.2 - professional operations UI */
 :root{
   --bg:#f5f7fb;
   --surface:#ffffff;
@@ -676,6 +681,7 @@ label{color:#334155;font-size:13px;font-weight:900}
   .history-row{grid-template-columns:minmax(0,1fr);gap:6px}
   .history-row strong{text-align:left}
 }
+
 
 
 

@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.2.6 - stocktake.js */
+/* Quản Lý Nhập Hàng V5.4.2 - stocktake.js */
 function stocktakeItems(machine) {
   const cabin = displayCabin();
   const products = new Set(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product));
@@ -19,7 +19,7 @@ function renderStocktake() {
     <div class="stocktake-list">${items.map(item => `
       <label class="stocktake-row" data-product="${htmlEscape(item.product)}" data-current="${item.qty}">
         <span><b>${htmlEscape(item.product)}</b><small>Tồn hệ thống: ${item.qty} sản phẩm</small></span>
-        <input type="number" step="1" inputmode="numeric" placeholder="Giữ ${item.qty}" />
+        <input type="number" min="0" step="1" inputmode="numeric" placeholder="Giữ ${item.qty}" />
       </label>`).join("")}</div>
     <div id="stocktakePreview" class="stocktake-preview">Ô để trống sẽ giữ nguyên tồn hiện tại.</div>
     <div class="stocktake-actions"><button id="resetStocktakeBtn" type="button" class="btn ghost">Nhập lại</button><button id="saveStocktakeBtn" type="button" class="btn primary">Lưu kiểm kê</button></div>`
@@ -50,10 +50,11 @@ function saveStocktakeBatch() {
     return { product: row.dataset.product, oldQty, actual, diff: actual === null ? 0 : actual - oldQty };
   }).filter(item => item.actual !== null);
   if (!rows.length) return showToast("Chưa nhập tồn thực tế nào.");
-  if (rows.some(item => !Number.isInteger(item.actual))) return showToast("Tồn thực tế phải là số nguyên.");
+  if (rows.some(item => !Number.isInteger(item.actual) || item.actual < 0)) return showToast("Tồn thực tế phải là số nguyên từ 0 trở lên.");
   const changes = rows.filter(item => item.diff !== 0);
   if (!changes.length) return showToast("Không có chênh lệch để lưu.");
   if (changes.some(item => Math.abs(item.diff) > 24) && !confirm("Có chênh lệch lớn hơn 24 sản phẩm. Vẫn lưu?")) return;
+  if (!confirm(`Lưu kiểm kê ${changes.length} sản phẩm cho ${$("#stocktakeMachine").value}?`)) return;
   const batchId = makeId();
   const date = $("#stocktakeDate").value || todayISO();
   const machine = $("#stocktakeMachine").value;
@@ -66,6 +67,7 @@ function saveStocktakeBatch() {
   renderStocktake();
   showToast(`Đã cập nhật tồn thực tế của ${changes.length} sản phẩm.`);
 }
+
 
 
 

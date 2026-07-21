@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.2.6 - fill.js */
+/* Quản Lý Nhập Hàng V5.4.2 - fill.js */
 function quickFillSlotsForMachine(machine) {
   return config().slots.filter(slot => slot.machine === machine)
     .sort((a, b) => Number(a.slot) - Number(b.slot));
@@ -89,6 +89,7 @@ function renderQuickFill() {
       if (v42FillStep < count - 1) setQuickStep(v42FillStep + 1, true);
       else $("#saveQuickFillBtn")?.focus();
     } else if (button.id === "clearQuickFillBtn") {
+      if (getQuickFillEntries().length && !confirm("Xóa toàn bộ số Fill Sản phẩm đang nhập?")) return;
       $$(".quick-fill-qty", box).forEach(input => { input.value = ""; });
       updateQuickFillPending(); persistQuickDraft();
     } else if (button.id === "saveQuickFillBtn") saveQuickFillBatch();
@@ -125,6 +126,8 @@ function saveQuickFillBatch() {
   const entries = getQuickFillEntries();
   if (!entries.length) return showToast("Chưa nhập số lượng Fill Sản phẩm.");
   if (entries.some(item => item.qty > 50) && !confirm("Có slot trên 50 sản phẩm. Vẫn lưu?")) return;
+  const total = entries.reduce((sum, item) => sum + item.qty, 0);
+  if (!confirm(`Lưu ${entries.length} slot Fill Sản phẩm, tổng ${total} sản phẩm?`)) return;
   const date = $("#quickDate").value || todayISO();
   const recordedAt = new Date().toISOString();
   entries.forEach(item => state.fillLogs.push(touchRecord({
@@ -136,6 +139,7 @@ function saveQuickFillBatch() {
   renderQuickFill();
   showToast(`Đã lưu ${entries.length} slot Fill Sản phẩm.`);
 }
+
 
 
 

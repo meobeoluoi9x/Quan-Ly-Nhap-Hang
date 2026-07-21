@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.2.6 - ncc.js */
+/* Quản Lý Nhập Hàng V5.4.2 - ncc.js */
 function nccProductsForMachine(machine) {
   return unique(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product))
     .sort((a, b) => a.localeCompare(b, "vi"));
@@ -74,6 +74,7 @@ function resetNccBatch(clearDraft = false) {
   const form = $("#nccForm");
   const box = $("#bulkNccRows");
   if (!form || !box) return;
+  if (clearDraft && nccDraftRows().some(item => Number(item.boxes || 0) > 0) && !confirm("Xóa toàn bộ số thùng NCC đang nhập?")) return;
   clearTimeout(v42NccDraftTimer);
   v42NccDraftTimer = 0;
   if (clearDraft) localStorage.removeItem(V42_NCC_DRAFT);
@@ -96,6 +97,9 @@ function saveNccBatch(form) {
     merged.get(key).boxes += item.boxes;
   });
   const rows = [...merged.values()];
+  const totalBoxes = rows.reduce((sum, item) => sum + item.boxes, 0);
+  const totalProducts = rows.reduce((sum, item) => sum + item.boxes * productInfo(item.product).pack, 0);
+  if (!confirm(`Lưu lô NCC gồm ${rows.length} sản phẩm, ${totalBoxes} thùng (${totalProducts} sản phẩm)?`)) return;
   const batchId = makeId();
   const recordedAt = new Date().toISOString();
   const date = form.date.value || todayISO();
@@ -108,6 +112,7 @@ function saveNccBatch(form) {
   resetNccBatch(true);
   showToast(`Đã lưu ${rows.length} sản phẩm NCC.`);
 }
+
 
 
 

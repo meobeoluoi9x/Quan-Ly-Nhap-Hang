@@ -1,6 +1,6 @@
-/* Quản Lý Nhập Hàng V5.2.6 - bootstrap.js */
+/* Quản Lý Nhập Hàng V5.4.2 - bootstrap.js */
 function bootApp() {
-  if ($(".app-header p")) $(".app-header p").textContent = "V5.2.6 - Tự cập nhật ngày hiện tại";
+  applyDisplaySettings();
   ensureSyncView();
   setupTabs();
   setupForms();
@@ -58,6 +58,24 @@ function bootApp() {
   });
 
   $("#stocktakeBox")?.addEventListener("input", updateStocktakePreview);
+  $("#exportCabinXlsxBtn")?.addEventListener("click", exportCabinXlsx);
+  $("#exportHistoryXlsxBtn")?.addEventListener("click", exportHistoryXlsx);
+  $("#selectAllHistoryMachines")?.addEventListener("click", () => {
+    const inputs = $$("#historyExportMachines input");
+    const check = inputs.some(input => !input.checked);
+    inputs.forEach(input => { input.checked = check; });
+  });
+  $("#displaySettingsForm")?.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!requirePermission("manage")) return;
+    const values = new FormData(event.currentTarget);
+    saveDisplaySettings({
+      title: String(values.get("title") || "").trim() || "Quản Lý Nhập Hàng",
+      version: String(values.get("version") || "").trim() || `V${APP_VERSION}`,
+      note: String(values.get("note") || "").trim()
+    });
+    showToast("Đã lưu hiển thị app.");
+  });
   $("#historyList")?.addEventListener("click", event => {
     const button = event.target.closest("[data-history-page]");
     if (button && !button.disabled) {
@@ -148,6 +166,7 @@ function bootApp() {
 }
 
 bootApp();
+
 
 
 

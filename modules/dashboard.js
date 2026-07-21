@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.2.6 - dashboard.js */
+/* Quản Lý Nhập Hàng V5.4.2 - dashboard.js */
 function renderRoute() {
   $("#todayText").textContent = viDate();
 
@@ -60,38 +60,6 @@ function renderCabin() {
           : `<span class="cabin-status cabin-status-blue">${htmlEscape(item.status)}</span>`;
     return `<div class="row qty-row ${item.cls}"><span><b>${htmlEscape(item.product)}</b>${warn}</span><b class="qty-num">${item.qty}</b></div>`;
   }).join("") || `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
-}
-
-function exportCabinCsv() {
-  const machine = activeCabinMachine;
-  const cab = displayCabin();
-  const rawCabin = currentCabin();
-  const rows = Object.entries(cab).map(([key, qty]) => {
-    const [rowMachine, product] = key.split("||");
-    if (rowMachine !== machine) return null;
-    const raw = Number(rawCabin[key] || 0);
-    const pack = productInfo(product).pack;
-    const status = raw < 0 ? `Lệch ${Math.abs(raw)} sản phẩm` : qty < 12 ? "Sắp hết" : qty < pack ? "Tồn thấp" : "Ổn";
-    return [machine, product, Number(qty || 0), status, pack];
-  }).filter(Boolean).sort((a, b) => a[1].localeCompare(b[1], "vi"));
-  if (!rows.length) return showToast("Máy này chưa có tồn cabin để xuất.");
-  const csvRows = [
-    ["Tồn cabin - Quản Lý Nhập Hàng"],
-    [`Máy: ${machine}`],
-    [`Xuất lúc: ${new Date().toLocaleString("vi-VN")}`],
-    [],
-    ["Máy", "Sản phẩm", "Tồn hiện tại", "Trạng thái", "Sản phẩm/thùng"],
-    ...rows,
-    [],
-    ["TỔNG", "", rows.reduce((sum, row) => sum + Number(row[2] || 0), 0), "", ""]
-  ];
-  const csv = "\ufeff" + csvRows.map(row => row.map(csvCell).join(",")).join("\r\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  a.download = `ton-cabin-${machine.replace(/[^a-zA-Z0-9_-]+/g, "-")}-${todayISO()}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  showToast(`Đã xuất tồn cabin ${machine}.`);
 }
 
 function quickFixNegative(machine, product, qty) {
@@ -227,6 +195,7 @@ function renderSelectedCabin() {
     return `<div class="compact-info-row ${cls}"><b>${htmlEscape(item.product)}</b><span>${item.qty} ${unitName(item.product)}${htmlEscape(warn)}</span></div>`;
   }).join("") : `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
 }
+
 
 
 
