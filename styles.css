@@ -353,7 +353,7 @@ main{max-width:1120px;padding:14px}
   .cabin-summary{grid-template-columns:1fr 1fr 1fr}
 }
 
-/* V5.4.2 */
+/* V5.4.9 */
 .operation-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 0 12px;padding:4px;border:1px solid #cbd5e1;border-radius:8px;background:#e2e8f0}
 .operation-tab{min-height:42px;padding:9px 10px;border-radius:6px;background:transparent;color:#334155;font-size:13px}
 .operation-tab.active{background:#0f172a;color:white}
@@ -425,7 +425,7 @@ main{max-width:1120px;padding:14px}
   .quick-fill-footer-actions{grid-template-columns:1fr}
 }
 
-/* V5.4.2 - professional operations UI */
+/* V5.4.9 - professional operations UI */
 :root{
   --bg:#f5f7fb;
   --surface:#ffffff;

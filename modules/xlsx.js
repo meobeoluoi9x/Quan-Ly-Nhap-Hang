@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.2 - xlsx.js */
+/* Quản Lý Nhập Hàng V5.4.9 - xlsx.js */
 function xlsxEscape(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -249,19 +249,69 @@ function historyMachineOrderIndex(machine) {
   return index === -1 ? 9999 : index;
 }
 
+function historySlotSortValue(slot) {
+  const value = String(slot ?? "").trim();
+  if (!value) return Number.MAX_SAFE_INTEGER;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : Number.MAX_SAFE_INTEGER - 1;
+}
+
 function historySortRows(rows) {
   return [...rows].sort((a, b) =>
     historyMachineOrderIndex(a.machine) - historyMachineOrderIndex(b.machine)
     || String(a.machine || "").localeCompare(String(b.machine || ""), "vi")
-    || Number(a.slot || 0) - Number(b.slot || 0)
+    || historySlotSortValue(a.slot) - historySlotSortValue(b.slot)
     || String(a.product || "").localeCompare(String(b.product || ""), "vi")
     || String(a.recorded_at || a.date).localeCompare(String(b.recorded_at || b.date))
   );
 }
 
+function historyNccTotalsByProduct(selectedMachines) {
+  const from = $("#historyDate")?.value || "";
+  const to = $("#historyToDate")?.value || "";
+  const query = ($("#historyProduct")?.value || "").trim().toLocaleLowerCase("vi");
+  const machines = new Set(selectedMachines || []);
+  const totals = new Map();
+  activeLogRows("nccLogs")
+    .filter(item => (!from || item.date >= from) && (!to || item.date <= to)
+      && (!query || String(item.product).toLocaleLowerCase("vi").includes(query))
+      && (!machines.size || machines.has(canonicalMachineName(item.machine))))
+    .forEach(item => {
+      const machine = item.machine || "";
+      const product = item.product || "";
+      const key = `${canonicalMachineName(machine)}||${product}`;
+      totals.set(key, (totals.get(key) || 0) + Math.abs(Number(item.qty || 0)));
+    });
+  return totals;
+}
+
+function historyFillLayoutRows(selectedMachines) {
+  const query = ($("#historyProduct")?.value || "").trim().toLocaleLowerCase("vi");
+  const machines = new Set(selectedMachines || []);
+  return config().slots
+    .filter(slot => (!machines.size || machines.has(canonicalMachineName(slot.machine)))
+      && (!query || String(slot.product).toLocaleLowerCase("vi").includes(query)))
+    .map(slot => ({
+      machine: slot.machine,
+      slot: String(slot.slot || ""),
+      product: slot.product || "",
+      qty: 0
+    }));
+}
+
 function historySummaryRows(rows, options = {}) {
   const summarySource = typeof options.summarySource === "function" ? options.summarySource : null;
+  const nccTotals = options.nccTotals instanceof Map ? options.nccTotals : new Map();
   const groups = new Map();
+  if (activeHistoryType === "fill" && Array.isArray(options.layoutRows)) {
+    options.layoutRows.forEach(item => {
+      const product = item.product || "";
+      const machine = item.machine || "";
+      const slot = String(item.slot || "");
+      const key = `${machine}||${slot}||${product}`;
+      if (!groups.has(key)) groups.set(key, { machine, slot, product, qty: 0 });
+    });
+  }
   historySortRows(rows).forEach(item => {
     const product = item.product || "";
     const machine = item.machine || "";
@@ -274,20 +324,28 @@ function historySummaryRows(rows, options = {}) {
   const sorted = [...groups.values()].sort((a, b) =>
     historyMachineOrderIndex(a.machine) - historyMachineOrderIndex(b.machine)
     || a.machine.localeCompare(b.machine, "vi")
-    || Number(a.slot || 0) - Number(b.slot || 0)
+    || historySlotSortValue(a.slot) - historySlotSortValue(b.slot)
     || a.product.localeCompare(b.product, "vi")
   );
   const metricLabel = activeHistoryType === "ncc" ? "Tổng NCC"
     : activeHistoryType === "transfer" ? "Tổng chuyển"
       : activeHistoryType === "adjust" ? "Tổng chênh lệch"
         : "Tổng đã nhập";
+  const nccPrinted = new Set();
   const body = sorted.map((item, index) => {
     const row = index + 5;
     const cabin = getCabinQty(item.machine, item.product);
     if (activeHistoryType === "fill") {
       const sourceRow = summarySource?.(item.machine, item.slot, item.product);
-      const manualStockCell = sourceRow ? { formula: `'${xlsxSafeSheetName(item.machine)}'!F${sourceRow}` } : "";
-      return xlsxDataRow([item.machine, item.slot, item.product, item.qty, cabin, manualStockCell, { formula: `E${row}+F${row}` }, { formula: `G${row}-D${row}` }, ""]);
+      const machineStockCell = sourceRow ? { formula: `'${xlsxSafeSheetName(item.machine)}'!G${sourceRow}` } : "";
+      const nccKey = `${canonicalMachineName(item.machine)}||${item.product}`;
+      const nccQty = nccPrinted.has(nccKey) ? "" : Number(nccTotals.get(nccKey) || 0);
+      nccPrinted.add(nccKey);
+      return xlsxDataRow([
+        item.machine, item.slot || "Chưa có slot", item.product, item.qty, nccQty,
+        cabin, machineStockCell, { formula: `N(F${row})+N(G${row})` },
+        { formula: `N(E${row})-N(D${row})-N(H${row})` }, ""
+      ]);
     }
     const sourceRow = summarySource?.(item.machine, "", item.product);
     const manualStockCell = sourceRow ? { formula: `'${xlsxSafeSheetName(item.machine)}'!E${sourceRow}` } : "";
@@ -296,12 +354,12 @@ function historySummaryRows(rows, options = {}) {
   const total = body.length + 5;
   if (activeHistoryType === "fill") {
     return [
-      xlsxTitleRow(`Tổng hợp lịch sử - ${historyExportTypeLabel()}`, 9),
-      xlsxDataRow([`Xuất lúc: ${new Date().toLocaleString("vi-VN")}`, "", "", "", "", "", "", "", ""]),
-      Array(9).fill(""),
-      xlsxHeaderRow(["Máy", "Slot", "Sản phẩm", "Tổng đã fill", "Tồn cabin hệ thống", "Tồn trong máy", "Tổng thực tế", "Chênh lệch", "Ghi chú"]),
+      xlsxTitleRow(`Tổng hợp lịch sử - ${historyExportTypeLabel()}`, 10),
+      xlsxDataRow([`Xuất lúc: ${new Date().toLocaleString("vi-VN")}`, "", "", "", "", "", "", "", "", ""]),
+      Array(10).fill(""),
+      xlsxHeaderRow(["Máy", "Slot", "Sản phẩm", "Tổng đã fill", "Tổng nhập NCC", "Tồn cabin", "Tồn trong máy", "Tổng trong máy", "Lệch NCC", "Ghi chú"]),
       ...body,
-      xlsxTotalRow(["TỔNG", "", "", { formula: `SUM(D5:D${total - 1})` }, { formula: `SUM(E5:E${total - 1})` }, { formula: `SUM(F5:F${total - 1})` }, { formula: `SUM(G5:G${total - 1})` }, { formula: `SUM(H5:H${total - 1})` }, ""])
+      xlsxTotalRow(["TỔNG", "", "", { formula: `SUM(D5:D${total - 1})` }, { formula: `SUM(E5:E${total - 1})` }, { formula: `SUM(F5:F${total - 1})` }, { formula: `SUM(G5:G${total - 1})` }, { formula: `SUM(H5:H${total - 1})` }, { formula: `SUM(I5:I${total - 1})` }, ""])
     ];
   }
   return [
@@ -323,7 +381,7 @@ function historyDetailRows(rows) {
   if (activeHistoryType === "transfer") {
     historyRowsV42().filter(item => Number(item.qty) > 0).forEach(item => transferTargets.set(`${item.batch_id || item.id}||${item.product}`, item.machine));
   }
-  const body = historySortRows(rows).map(item => activeHistoryType === "fill" ? xlsxDataRow([historyDateTime(item), item.machine, item.slot || "", item.product, item.qty])
+  const body = historySortRows(rows).map(item => activeHistoryType === "fill" ? xlsxDataRow([historyDateTime(item), item.machine, item.slot || "Chưa có slot", item.product, item.qty])
     : activeHistoryType === "ncc" ? xlsxDataRow([historyDateTime(item), item.machine, item.product, nccBoxes(item), item.qty])
       : activeHistoryType === "transfer" ? xlsxDataRow([historyDateTime(item), item.machine, transferTargets.get(`${item.batch_id || item.id}||${item.product}`) || "", item.product, Math.abs(Number(item.qty || 0))])
         : xlsxDataRow([historyDateTime(item), item.machine, item.product, Number(item.actual) - Number(item.qty), item.actual, item.qty]));
@@ -350,16 +408,23 @@ function exportHistoryXlsx() {
   unique(sortedRows.map(row => row.machine)).forEach(machine => {
     if (!machines.some(item => canonicalMachineName(item) === canonicalMachineName(machine))) machines.push(machine);
   });
-  const summaryWidth = activeHistoryType === "fill" ? [18, 10, 30, 16, 18, 16, 16, 14, 24] : [18, 30, 16, 18, 16, 16, 14, 24];
-  const summaryFilterLastCol = activeHistoryType === "fill" ? "I" : "H";
+  const nccTotals = activeHistoryType === "fill" ? historyNccTotalsByProduct(selectedMachines) : new Map();
+  const fillLayoutRows = activeHistoryType === "fill" ? historyFillLayoutRows(selectedMachines) : [];
+  fillLayoutRows.forEach(row => {
+    if (!machines.some(machine => canonicalMachineName(machine) === canonicalMachineName(row.machine))) machines.push(row.machine);
+  });
+  const summaryWidth = activeHistoryType === "fill" ? [18, 10, 30, 16, 16, 14, 16, 16, 14, 24] : [18, 30, 16, 18, 16, 16, 14, 24];
+  const summaryFilterLastCol = activeHistoryType === "fill" ? "J" : "H";
   const sourceRowsByKey = new Map();
   machines.forEach(machine => {
     const machineRows = sortedRows.filter(row => canonicalMachineName(row.machine) === canonicalMachineName(machine));
-    const machineSummary = historySummaryRows(machineRows);
+    const machineLayoutRows = fillLayoutRows.filter(row => canonicalMachineName(row.machine) === canonicalMachineName(machine));
+    const machineSummary = historySummaryRows(machineRows, { nccTotals, layoutRows: machineLayoutRows });
     const bodyEnd = Math.max(4, machineSummary.length - 1);
     for (let row = 5; row <= bodyEnd; row++) {
       const machineName = machineSummary[row - 1]?.[0]?.value || machine;
-      const slot = activeHistoryType === "fill" ? machineSummary[row - 1]?.[1]?.value || "" : "";
+      const slotValue = activeHistoryType === "fill" ? machineSummary[row - 1]?.[1]?.value || "" : "";
+      const slot = slotValue === "Chưa có slot" ? "" : slotValue;
       const product = activeHistoryType === "fill" ? machineSummary[row - 1]?.[2]?.value || "" : machineSummary[row - 1]?.[1]?.value || "";
       sourceRowsByKey.set(activeHistoryType === "fill" ? `${machineName}||${slot}||${product}` : `${machineName}||${product}`, row);
     }
@@ -367,13 +432,15 @@ function exportHistoryXlsx() {
   const sheets = [{
     name: "Tong hop",
     rows: historySummaryRows(sortedRows, {
+      nccTotals,
+      layoutRows: fillLayoutRows,
       summarySource(machine, slot, product) {
         return sourceRowsByKey.get(activeHistoryType === "fill" ? `${machine}||${slot}||${product}` : `${machine}||${product}`) || "";
       }
     }),
     widths: summaryWidth,
     freezeTopRow: true,
-    autoFilter: `A4:${summaryFilterLastCol}${Math.max(5, rows.length + 5)}`,
+    autoFilter: `A4:${summaryFilterLastCol}${Math.max(5, rows.length + fillLayoutRows.length + 5)}`,
     landscape: true
   }, {
     name: "Chi tiet",
@@ -385,14 +452,15 @@ function exportHistoryXlsx() {
   }];
   machines.forEach(machine => {
     const machineRows = sortedRows.filter(row => canonicalMachineName(row.machine) === canonicalMachineName(machine));
+    const machineLayoutRows = fillLayoutRows.filter(row => canonicalMachineName(row.machine) === canonicalMachineName(machine));
     const machineSummaryWidth = activeHistoryType === "fill" ? summaryWidth : [18, 30, 16, 18, 16, 16, 14, 24];
-    const machineSummaryFilterLastCol = activeHistoryType === "fill" ? "I" : "H";
+    const machineSummaryFilterLastCol = activeHistoryType === "fill" ? "J" : "H";
     sheets.push({
       name: machine,
-      rows: historySummaryRows(machineRows),
+      rows: historySummaryRows(machineRows, { nccTotals, layoutRows: machineLayoutRows }),
       widths: machineSummaryWidth,
       freezeTopRow: true,
-      autoFilter: `A4:${machineSummaryFilterLastCol}${Math.max(5, machineRows.length + 5)}`,
+      autoFilter: `A4:${machineSummaryFilterLastCol}${Math.max(5, machineRows.length + machineLayoutRows.length + 5)}`,
       landscape: true
     });
   });

@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.2 - bootstrap.js */
+/* Quản Lý Nhập Hàng V5.4.9 - bootstrap.js */
 function bootApp() {
   applyDisplaySettings();
   ensureSyncView();
