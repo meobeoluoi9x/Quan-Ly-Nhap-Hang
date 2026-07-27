@@ -1,8 +1,8 @@
-/* Quan Ly Nhap Hang V5.4.10 - order logic */
+/* Quan Ly Nhap Hang V5.4.11 - order logic */
 function defaultStorageRules() {
   return [
     { id: stableConfigId("storage-rule", "Aqua"), product: "Aqua", no_wrap: true, pack: 28, shelf_per_pack: 1, max_packs: 3, created_at: "", updated_at: "", _sync: "seeded" },
-    { id: stableConfigId("storage-rule", "Sting lon Dâu"), product: "Sting lon Dâu", no_wrap: true, pack: 24, shelf_per_pack: 0.5, max_packs: 2, created_at: "", updated_at: "", _sync: "seeded" }
+    { id: stableConfigId("storage-rule", "Sting lon Dâu"), product: "Sting lon Dâu", no_wrap: true, pack: 28, shelf_per_pack: 0.5, max_packs: 2, created_at: "", updated_at: "", _sync: "seeded" }
   ];
 }
 
@@ -22,7 +22,8 @@ function isAquaProduct(product) {
 
 function productInfo(product) {
   const rule = storageRuleForProduct(product);
-  return config().products?.[product] || { pack: rule?.pack || (isAquaProduct(product) ? 28 : 24), minPacks: 1 };
+  const base = config().products?.[product] || { pack: isAquaProduct(product) ? 28 : 24, minPacks: 1 };
+  return { ...base, pack: Number(rule?.pack || base.pack || 24) };
 }
 
 function packText(qty, product) {

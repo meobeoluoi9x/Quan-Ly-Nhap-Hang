@@ -1,4 +1,4 @@
-const APP_VERSION = "5.4.10";
+const APP_VERSION = "5.4.11";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -1213,6 +1213,13 @@ function seedProductStorageRules() {
   defaultStorageRules().forEach(defaultRule => {
     const existingRule = state.productStorageRules.find(rule => !rule.deleted_at && String(rule.product || "").toLocaleLowerCase("vi") === defaultRule.product.toLocaleLowerCase("vi"));
     if (existingRule) {
+      const isOldStingCanPack = defaultRule.product === "Sting lon Dâu"
+        && Number(defaultRule.pack) === 28 && Number(existingRule.pack || 0) === 24;
+      if (isOldStingCanPack) {
+        existingRule.pack = Number(defaultRule.pack);
+        existingRule.updated_at = now;
+        changed = true;
+      }
       if (isAquaProduct(existingRule.product) && Number(existingRule.max_packs) < 3) {
         existingRule.max_packs = 3;
         existingRule.updated_at = now;

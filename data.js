@@ -64,7 +64,7 @@ window.FILL_CONFIG = {
       "minPacks": 1
     },
     "Sting lon Dâu": {
-      "pack": 24,
+      "pack": 28,
       "minPacks": 1
     },
     "Sting pet vàng": {

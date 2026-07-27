@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Quản Lý Nhập Hàng V5.4.10</title>
-  <link rel="manifest" href="manifest.json?v=5.4.10" />
-  <link rel="stylesheet" href="styles.css?v=5.4.10" />
+  <title>Quản Lý Nhập Hàng V5.4.11</title>
+  <link rel="manifest" href="manifest.json?v=5.4.11" />
+  <link rel="stylesheet" href="styles.css?v=5.4.11" />
 </head>
 <body>
   <div class="app">
@@ -14,7 +14,7 @@
       <button id="menuToggle" class="icon-btn" type="button" aria-label="Mở menu" aria-controls="sideNav" aria-expanded="false">&#9776;</button>
       <div class="app-brand">
         <h1>Quản Lý Nhập Hàng</h1>
-        <p>V5.4.10 - Xuất Excel và phân quyền xem</p>
+        <p>V5.4.11 - Xuất Excel và phân quyền xem</p>
       </div>
       <button id="syncBadge" class="sync-badge" type="button">Local</button>
       <button id="accountBtn" class="account-btn" type="button" aria-label="Tài khoản">Đăng nhập</button>
@@ -195,7 +195,7 @@
             <select id="managementSelect">
               <option value="account">Tài khoản và phân quyền</option>
               <option value="layout">Thay đổi layout</option>
-              <option value="storage">Hàng tốn chỗ</option>
+              <option value="storage">Quy cách thùng</option>
               <option value="display">Hiển thị app</option>
               <option value="updates">Cập nhật phiên bản</option>
               <option value="sync">Đồng bộ dữ liệu</option>
@@ -232,15 +232,16 @@
           <div class="section-head"><h2>Hiển thị app</h2><span class="hint">Chỉ đổi chữ trên giao diện</span></div>
           <form id="displaySettingsForm">
             <label>Tên app <input name="title" type="text" maxlength="60" required /></label>
-            <label>Phiên bản hiển thị <input name="version" type="text" maxlength="20" placeholder="V5.4.10" /></label>
+            <label>Phiên bản hiển thị <input name="version" type="text" maxlength="20" placeholder="V5.4.11" /></label>
             <label>Ghi chú phiên bản <input name="note" type="text" maxlength="80" placeholder="Xuất Excel và phân quyền xem" /></label>
             <button type="submit" class="btn primary">Lưu hiển thị</button>
           </form>
           <p class="muted">Phiên bản cache kỹ thuật vẫn do code quản lý để tránh lỗi cập nhật app.</p>
         </article>
         <article class="card management-panel" data-management-panel="updates">
-          <div class="section-head"><h2>Cập nhật phiên bản</h2><span class="hint">V5.4.10</span></div>
+          <div class="section-head"><h2>Cập nhật phiên bản</h2><span class="hint">V5.4.11</span></div>
           <div class="version-notes">
+            <div><b>V5.4.11 - Quy cách thùng trong Quản lý</b><span>Phần Quy cách thùng có thể chỉnh SP/thùng, dùng để tính Nhập NCC, đơn đặt hàng và hàng tốn chỗ.</span></div>
             <div><b>V5.4.10 - Ổn định phím lên xuống mobile</b><span>Đồng bộ ô đang focus khi nhập Fill Sản phẩm để phím lên/xuống không nhảy quá slot.</span></div>
             <div><b>V5.4.9 - Công thức lệch NCC gọn hơn</b><span>Lệch NCC dùng công thức Tổng nhập NCC - Tổng đã fill - Tổng trong máy để dễ kiểm tra trong Excel.</span></div>
             <div><b>V5.4.8 - Tổng trong máy và lệch NCC</b><span>Đổi Tồn cabin cuối tháng thành Tồn cabin, thêm Tổng trong máy và tính Lệch NCC trừ cả tồn trong máy.</span></div>
@@ -300,14 +301,14 @@
           </div>
         </article>
         <article id="storageRuleCard" class="card management-panel hidden" data-management-panel="storage">
-          <div class="section-head"><h2>Hàng tốn chỗ</h2><span class="hint">Quản trị viên</span></div>
-          <p class="muted">Áp dụng cho sản phẩm không có lốc, phải cất nguyên thùng trong cabin.</p>
+          <div class="section-head"><h2>Quy cách thùng</h2><span class="hint">Quản trị viên</span></div>
+          <p class="muted">Chỉnh số sản phẩm mỗi thùng và giới hạn cho hàng không có lốc, tốn diện tích cabin.</p>
           <form id="storageRuleForm">
             <div class="storage-rule-head" aria-hidden="true"><span>Sản phẩm</span><span>SP/thùng</span><span>Ngăn/thùng</span><span>Giới hạn thùng</span><span></span></div>
             <div id="storageRuleRows" class="storage-rule-rows"></div>
             <div class="button-row bulk-actions">
               <button id="addStorageRuleBtn" type="button" class="btn ghost">+ Sản phẩm</button>
-              <button type="submit" class="btn primary">Lưu cấu hình tốn chỗ</button>
+              <button type="submit" class="btn primary">Lưu quy cách thùng</button>
             </div>
           </form>
         </article>
@@ -333,19 +334,19 @@
       </div>
     </section>
   </div>
-  <script src="data.js?v=5.4.10"></script>
-  <script src="modules/order.js?v=5.4.10"></script>
-  <script src="app.js?v=5.4.10"></script>
-  <script src="modules/dashboard.js?v=5.4.10"></script>
-  <script src="modules/runtime-core.js?v=5.4.10"></script>
-  <script src="modules/xlsx.js?v=5.4.10"></script>
-  <script src="modules/fill.js?v=5.4.10"></script>
-  <script src="modules/ncc.js?v=5.4.10"></script>
-  <script src="modules/stocktake.js?v=5.4.10"></script>
-  <script src="modules/transfer.js?v=5.4.10"></script>
-  <script src="modules/history.js?v=5.4.10"></script>
-  <script src="modules/ui.js?v=5.4.10"></script>
-  <script src="modules/bootstrap.js?v=5.4.10"></script>
+  <script src="data.js?v=5.4.11"></script>
+  <script src="modules/order.js?v=5.4.11"></script>
+  <script src="app.js?v=5.4.11"></script>
+  <script src="modules/dashboard.js?v=5.4.11"></script>
+  <script src="modules/runtime-core.js?v=5.4.11"></script>
+  <script src="modules/xlsx.js?v=5.4.11"></script>
+  <script src="modules/fill.js?v=5.4.11"></script>
+  <script src="modules/ncc.js?v=5.4.11"></script>
+  <script src="modules/stocktake.js?v=5.4.11"></script>
+  <script src="modules/transfer.js?v=5.4.11"></script>
+  <script src="modules/history.js?v=5.4.11"></script>
+  <script src="modules/ui.js?v=5.4.11"></script>
+  <script src="modules/bootstrap.js?v=5.4.11"></script>
 </body>
 </html>
 
