@@ -1,4 +1,4 @@
-const APP_VERSION = "5.4.11";
+const APP_VERSION = "5.4.13";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -1470,14 +1470,15 @@ function renderMachineManager(force = false) {
   if (!canManage) return;
   if (machineEditorDirty && !force) return;
   const machines = activeMachineConfigs();
-  if (!selectedMachineEditorId || !machines.some(machine => machine.id === selectedMachineEditorId)) selectedMachineEditorId = machines[0]?.id || null;
+  if (!machineEditorNew && (!selectedMachineEditorId || !machines.some(machine => machine.id === selectedMachineEditorId))) selectedMachineEditorId = machines[0]?.id || null;
   const select = $("#machineEditorSelect");
-  select.innerHTML = machines.map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("");
-  if (selectedMachineEditorId) select.value = selectedMachineEditorId;
+  select.innerHTML = `${machineEditorNew ? `<option value="">+ Máy mới</option>` : ""}${machines.map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("")}`;
+  if (machineEditorNew) select.value = "";
+  else if (selectedMachineEditorId) select.value = selectedMachineEditorId;
   const source = $("#duplicateMachineSource");
   source.innerHTML = machines.filter(machine => machine.id !== selectedMachineEditorId)
     .map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("");
-  const machine = selectedMachineConfig();
+  const machine = machineEditorNew ? null : selectedMachineConfig();
   const form = $("#machineEditorForm");
   form.elements.name.value = machine?.name || "";
   $("#layoutEditorRows").innerHTML = "";
@@ -1534,11 +1535,12 @@ function saveMachineAndLayout(form) {
     return showToast("Kiểm tra lại số slot, sản phẩm và sức chứa.");
   }
   if (new Set(rows.map(row => row.slot_number)).size !== rows.length) return showToast("Số slot không được trùng nhau.");
-  let machine = selectedMachineConfig();
+  let machine = machineEditorNew ? null : selectedMachineConfig();
   if (!machine) {
     machine = touchConfigRecord({ id: makeId(), name, original_name: name, aliases: [], group_name: "", cycle_days: 1, archived: false });
     state.machineConfigs.push(machine);
     selectedMachineEditorId = machine.id;
+    machineEditorNew = false;
   } else {
     if (machine.name !== name) machine.aliases = unique([...(machine.aliases || []), machine.name]);
     machine.name = name;
@@ -1571,12 +1573,14 @@ function setupMachineManagerEvents() {
   $("#machineEditorSelect")?.addEventListener("change", event => {
     if (!confirmDiscardMachineDraft()) { event.target.value = selectedMachineEditorId || ""; return; }
     machineEditorDirty = false;
-    selectedMachineEditorId = event.target.value;
+    machineEditorNew = !event.target.value;
+    selectedMachineEditorId = event.target.value || null;
     renderMachineManager(true);
   });
   $("#newMachineBtn")?.addEventListener("click", () => {
     if (!confirmDiscardMachineDraft()) return;
     machineEditorDirty = false;
+    machineEditorNew = true;
     selectedMachineEditorId = null;
     renderMachineManager(true);
     $("#machineEditorForm input[name='name']")?.focus();
@@ -1673,7 +1677,24 @@ function mergeConfigRows(key, remoteRows) {
   const map = new Map((state[key] || []).map(item => [item.id, item]));
   remoteRows.forEach(row => {
     const local = map.get(row.id);
-    if (!local || String(row.updated_at || "") >= String(local.updated_at || "") || local._sync !== "pending") {
+    if (!local) {
+      map.set(row.id, { ...row, _sync: "synced" });
+      return;
+    }
+
+    // Do not let an older remote snapshot overwrite newer local data.
+    // The previous implementation used `local._sync !== "pending"` as an
+    // unconditional remote-win condition, so an old archived=true row from
+    // Supabase could make a machine disappear again on every sync.
+    if (local._sync === "pending") return;
+
+    const remoteTime = Date.parse(row.updated_at || "");
+    const localTime = Date.parse(local.updated_at || "");
+    const remoteIsNewer = Number.isFinite(remoteTime)
+      ? (!Number.isFinite(localTime) || remoteTime > localTime)
+      : (!local.updated_at && Boolean(row.updated_at));
+
+    if (remoteIsNewer) {
       map.set(row.id, { ...row, _sync: "synced" });
     }
   });

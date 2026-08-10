@@ -1,4 +1,4 @@
-const CACHE = "quan-ly-nhap-hang-v5-4-11";
+const CACHE = "quan-ly-nhap-hang-v5-4-12";
 const LOCAL_HOSTS = ["127.0.0.1", "localhost", "::1"];
 const IS_LOCAL_PREVIEW = LOCAL_HOSTS.includes(self.location.hostname);
 const ASSETS = [

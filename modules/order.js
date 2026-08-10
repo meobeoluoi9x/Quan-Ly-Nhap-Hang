@@ -1,4 +1,4 @@
-/* Quan Ly Nhap Hang V5.4.11 - order logic */
+/* Quan Ly Nhap Hang V5.4.12 - order logic */
 function defaultStorageRules() {
   return [
     { id: stableConfigId("storage-rule", "Aqua"), product: "Aqua", no_wrap: true, pack: 28, shelf_per_pack: 1, max_packs: 3, created_at: "", updated_at: "", _sync: "seeded" },

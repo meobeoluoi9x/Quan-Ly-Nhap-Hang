@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.11 - xlsx.js */
+/* Quản Lý Nhập Hàng V5.4.12 - xlsx.js */
 function xlsxEscape(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
