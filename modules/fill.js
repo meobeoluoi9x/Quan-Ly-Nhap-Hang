@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.12 - fill.js */
+/* Quản Lý Nhập Hàng V5.4.13 - fill.js */
 function quickFillSlotsForMachine(machine) {
   return config().slots.filter(slot => slot.machine === machine)
     .sort((a, b) => Number(a.slot) - Number(b.slot));

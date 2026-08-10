@@ -908,23 +908,55 @@ function normalizeAccess(data) {
   };
 }
 
+function isAccessDeniedError(error) {
+  const message = String(error?.message || error?.details || error?.hint || "").toLocaleLowerCase("vi");
+  return message.includes("chưa được cấp quyền") || message.includes("chua duoc cap quyen")
+    || message.includes("chưa được quản trị viên cấp quyền") || message.includes("chua duoc quan tri vien cap quyen");
+}
+
 async function loadMyAccess(options = {}) {
   if (!syncClient || !syncUser) return false;
   try {
     const { data, error } = await syncClient.rpc("bootstrap_fill_assistant_owner");
     if (error) throw error;
-    cacheAccess(normalizeAccess(data));
+    const access = normalizeAccess(data);
+    if (!access) {
+      cacheAccess(null);
+      syncStatusText = "Chưa được cấp quyền";
+      renderAuthUI();
+      return false;
+    }
+    cacheAccess(access);
     prepareLocalRowsForWorkspace();
     syncStatusText = "Đã kết nối";
     renderAuthUI();
     if (syncAccess?.is_admin) renderMembers();
-    return Boolean(syncAccess);
+    return true;
   } catch (error) {
     const cachedForUser = syncAccess?.user_id === syncUser.id;
-    if (!cachedForUser || navigator.onLine) cacheAccess(null);
-    syncStatusText = navigator.onLine ? "Chưa được cấp quyền" : "Đang dùng quyền offline";
+    const denied = isAccessDeniedError(error);
+
+    if (!cachedForUser) {
+      cacheAccess(null);
+    } else if (denied) {
+      // Chỉ xóa cache khi Supabase xác nhận rõ ràng tài khoản không có quyền.
+      cacheAccess(null);
+    }
+
+    if (denied) {
+      syncStatusText = "Chưa được cấp quyền";
+    } else if (cachedForUser) {
+      syncStatusText = "Không kiểm tra được quyền — đang dùng quyền đã lưu";
+    } else {
+      syncStatusText = "Không kiểm tra được quyền";
+    }
+
     renderAuthUI();
-    if (!options.quiet) showToast(error.message || "Tài khoản chưa được cấp quyền.");
+    if (!options.quiet) {
+      showToast(denied
+        ? (error.message || "Tài khoản chưa được cấp quyền.")
+        : (error.message || "Không kiểm tra được quyền. Quyền đã lưu được giữ nguyên."));
+    }
     return Boolean(syncAccess);
   }
 }
@@ -1157,6 +1189,7 @@ if ("serviceWorker" in navigator) {
 
 /* V4.1.0 - Quản Lý Nhập Hàng */
 var selectedMachineEditorId = null;
+var machineEditorNew = false;
 var machineSchemaAvailable = true;
 var machineEditorDirty = false;
 
@@ -1472,13 +1505,13 @@ function renderMachineManager(force = false) {
   const machines = activeMachineConfigs();
   if (!machineEditorNew && (!selectedMachineEditorId || !machines.some(machine => machine.id === selectedMachineEditorId))) selectedMachineEditorId = machines[0]?.id || null;
   const select = $("#machineEditorSelect");
-  select.innerHTML = `${machineEditorNew ? `<option value="">+ Máy mới</option>` : ""}${machines.map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("")}`;
+  select.innerHTML = `${machineEditorNew ? '<option value="">+ Máy mới</option>' : ''}${machines.map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("")}`;
   if (machineEditorNew) select.value = "";
   else if (selectedMachineEditorId) select.value = selectedMachineEditorId;
   const source = $("#duplicateMachineSource");
   source.innerHTML = machines.filter(machine => machine.id !== selectedMachineEditorId)
     .map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("");
-  const machine = machineEditorNew ? null : selectedMachineConfig();
+  const machine = selectedMachineConfig();
   const form = $("#machineEditorForm");
   form.elements.name.value = machine?.name || "";
   $("#layoutEditorRows").innerHTML = "";
@@ -1535,12 +1568,11 @@ function saveMachineAndLayout(form) {
     return showToast("Kiểm tra lại số slot, sản phẩm và sức chứa.");
   }
   if (new Set(rows.map(row => row.slot_number)).size !== rows.length) return showToast("Số slot không được trùng nhau.");
-  let machine = machineEditorNew ? null : selectedMachineConfig();
+  let machine = selectedMachineConfig();
   if (!machine) {
     machine = touchConfigRecord({ id: makeId(), name, original_name: name, aliases: [], group_name: "", cycle_days: 1, archived: false });
     state.machineConfigs.push(machine);
     selectedMachineEditorId = machine.id;
-    machineEditorNew = false;
   } else {
     if (machine.name !== name) machine.aliases = unique([...(machine.aliases || []), machine.name]);
     machine.name = name;
@@ -1560,6 +1592,7 @@ function saveMachineAndLayout(form) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   cabinSnapshot = null;
   machineEditorDirty = false;
+  machineEditorNew = false;
   refreshOperationalSelects();
   renderMachineManager(true);
   renderAll();
@@ -1573,8 +1606,8 @@ function setupMachineManagerEvents() {
   $("#machineEditorSelect")?.addEventListener("change", event => {
     if (!confirmDiscardMachineDraft()) { event.target.value = selectedMachineEditorId || ""; return; }
     machineEditorDirty = false;
-    machineEditorNew = !event.target.value;
-    selectedMachineEditorId = event.target.value || null;
+    machineEditorNew = false;
+    selectedMachineEditorId = event.target.value;
     renderMachineManager(true);
   });
   $("#newMachineBtn")?.addEventListener("click", () => {
@@ -1611,6 +1644,7 @@ function setupMachineManagerEvents() {
     machine.archived = true;
     touchConfigRecord(machine);
     machineEditorDirty = false;
+    machineEditorNew = false;
     selectedMachineEditorId = null;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     refreshOperationalSelects(); renderMachineManager(true); renderAll(); queueAutoSync();

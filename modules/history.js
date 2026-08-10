@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.12 - history.js */
+/* Quản Lý Nhập Hàng V5.4.13 - history.js */
 function isTransferRecord(item) {
   return String(item.reason || "").startsWith("Chuyển tồn:");
 }

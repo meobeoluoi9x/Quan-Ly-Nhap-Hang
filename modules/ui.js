@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.12 - ui.js */
+/* Quản Lý Nhập Hàng V5.4.13 - ui.js */
 function activateCabinSubview(name) {
   $$("[data-cabin-view]").forEach(button => button.classList.toggle("active", button.dataset.cabinView === name));
   $$("[data-cabin-panel]").forEach(panel => {
