@@ -1,4 +1,4 @@
-/* Quan Ly Nhap Hang V5.4.13 - order logic */
+/* Quan Ly Nhap Hang V5.4.11 - order logic */
 function defaultStorageRules() {
   return [
     { id: stableConfigId("storage-rule", "Aqua"), product: "Aqua", no_wrap: true, pack: 28, shelf_per_pack: 1, max_packs: 3, created_at: "", updated_at: "", _sync: "seeded" },
@@ -101,8 +101,10 @@ function suggestedOrderForLayout(stock, product, layout, projected) {
 
 function buildOrderRows() {
   const rawCabin = currentCabin();
-  const keys = new Set(Object.keys(rawCabin));
-  config().slots.forEach(slot => keys.add(`${slot.machine}||${slot.product}`));
+  const keys = new Set();
+  config().slots.forEach(slot => {
+    if (slot.machine && slot.product) keys.add(`${slot.machine}||${slot.product}`);
+  });
   const rows = [];
   keys.forEach(key => {
     const [machine, product] = key.split("||");

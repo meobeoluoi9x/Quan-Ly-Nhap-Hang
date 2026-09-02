@@ -1,10 +1,11 @@
-const APP_VERSION = "5.4.13";
+const APP_VERSION = "5.5.0";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
 const SYNC_CONFIG_KEY = "fill_assistant_supabase_config";
 const DEVICE_ID_KEY = "fill_assistant_device_id";
 const ACCESS_CACHE_KEY = "fill_assistant_access";
+const ORDER_ADJUST_KEY = "qlnh_order_adjustments_v55";
 const DEFAULT_SUPABASE_URL = "https://ylopccoxnbhtmrghldpn.supabase.co";
 // Paste the public browser key here. Never paste sb_secret/service_role keys.
 // Optional light obfuscation: use "b64:" + base64 encoded publishable key.
@@ -268,6 +269,76 @@ function showToast(message, undoable = false) {
 
 function totalPacks(rows) {
   return rows.reduce((sum, row) => sum + Number(row.pack?.packs || 0), 0);
+}
+
+function orderAdjustments() {
+  try {
+    return JSON.parse(localStorage.getItem(ORDER_ADJUST_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function orderAdjustKey(machine, product) {
+  return `${canonicalMachineName(machine)}||${product}`;
+}
+
+function adjustedOrderRows(rows = buildOrderRows()) {
+  const adjustments = orderAdjustments();
+  return rows.map(row => {
+    const key = orderAdjustKey(row.machine, row.product);
+    const hasAdjustment = Object.prototype.hasOwnProperty.call(adjustments, key);
+    const adjustedPacks = hasAdjustment ? Math.max(0, Number(adjustments[key] || 0)) : Number(row.pack?.packs || 0);
+    const packSize = Number(row.pack?.packSize || productInfo(row.product).pack || 24);
+    return {
+      ...row,
+      adjustedPacks,
+      adjustedQty: adjustedPacks * packSize,
+      pack: { ...row.pack, packs: adjustedPacks, qty: adjustedPacks * packSize, packSize }
+    };
+  }).filter(row => Number(row.adjustedPacks || 0) > 0);
+}
+
+function saveOrderAdjustment(machine, product, packs) {
+  const adjustments = orderAdjustments();
+  const key = orderAdjustKey(machine, product);
+  const value = Math.max(0, Number(packs || 0));
+  const suggested = buildOrderRows().find(row => orderAdjustKey(row.machine, row.product) === key);
+  const suggestedPacks = Number(suggested?.pack?.packs || 0);
+  if (value === suggestedPacks) delete adjustments[key];
+  else adjustments[key] = value;
+  localStorage.setItem(ORDER_ADJUST_KEY, JSON.stringify(adjustments));
+}
+
+function groupOrdersByProduct(rows) {
+  const groups = new Map();
+  rows.forEach(row => {
+    const key = row.product;
+    const packSize = Number(row.pack?.packSize || productInfo(row.product).pack || 24);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        ...row,
+        machine: "Tổng hợp",
+        slotCount: "",
+        capacity: "",
+        qty: 0,
+        projected: "",
+        storageReason: "",
+        sourceMachines: new Set(),
+        pack: { ...row.pack, packs: 0, qty: 0, packSize }
+      });
+    }
+    const group = groups.get(key);
+    group.qty += Number(row.qty || 0);
+    group.pack.packs += Number(row.pack?.packs || 0);
+    group.pack.qty += Number(row.pack?.qty || 0);
+    group.sourceMachines.add(row.machine);
+  });
+  return [...groups.values()].map(row => ({
+    ...row,
+    machine: [...row.sourceMachines].join(", "),
+    storageReason: row.sourceMachines.size > 1 ? `Gộp từ ${row.sourceMachines.size} máy` : ""
+  })).sort((a, b) => a.product.localeCompare(b.product, "vi"));
 }
 
 
@@ -908,55 +979,23 @@ function normalizeAccess(data) {
   };
 }
 
-function isAccessDeniedError(error) {
-  const message = String(error?.message || error?.details || error?.hint || "").toLocaleLowerCase("vi");
-  return message.includes("chưa được cấp quyền") || message.includes("chua duoc cap quyen")
-    || message.includes("chưa được quản trị viên cấp quyền") || message.includes("chua duoc quan tri vien cap quyen");
-}
-
 async function loadMyAccess(options = {}) {
   if (!syncClient || !syncUser) return false;
   try {
     const { data, error } = await syncClient.rpc("bootstrap_fill_assistant_owner");
     if (error) throw error;
-    const access = normalizeAccess(data);
-    if (!access) {
-      cacheAccess(null);
-      syncStatusText = "Chưa được cấp quyền";
-      renderAuthUI();
-      return false;
-    }
-    cacheAccess(access);
+    cacheAccess(normalizeAccess(data));
     prepareLocalRowsForWorkspace();
     syncStatusText = "Đã kết nối";
     renderAuthUI();
     if (syncAccess?.is_admin) renderMembers();
-    return true;
+    return Boolean(syncAccess);
   } catch (error) {
     const cachedForUser = syncAccess?.user_id === syncUser.id;
-    const denied = isAccessDeniedError(error);
-
-    if (!cachedForUser) {
-      cacheAccess(null);
-    } else if (denied) {
-      // Chỉ xóa cache khi Supabase xác nhận rõ ràng tài khoản không có quyền.
-      cacheAccess(null);
-    }
-
-    if (denied) {
-      syncStatusText = "Chưa được cấp quyền";
-    } else if (cachedForUser) {
-      syncStatusText = "Không kiểm tra được quyền — đang dùng quyền đã lưu";
-    } else {
-      syncStatusText = "Không kiểm tra được quyền";
-    }
-
+    if (!cachedForUser || navigator.onLine) cacheAccess(null);
+    syncStatusText = navigator.onLine ? "Chưa được cấp quyền" : "Đang dùng quyền offline";
     renderAuthUI();
-    if (!options.quiet) {
-      showToast(denied
-        ? (error.message || "Tài khoản chưa được cấp quyền.")
-        : (error.message || "Không kiểm tra được quyền. Quyền đã lưu được giữ nguyên."));
-    }
+    if (!options.quiet) showToast(error.message || "Tài khoản chưa được cấp quyền.");
     return Boolean(syncAccess);
   }
 }
@@ -1189,7 +1228,6 @@ if ("serviceWorker" in navigator) {
 
 /* V4.1.0 - Quản Lý Nhập Hàng */
 var selectedMachineEditorId = null;
-var machineEditorNew = false;
 var machineSchemaAvailable = true;
 var machineEditorDirty = false;
 
@@ -1503,11 +1541,10 @@ function renderMachineManager(force = false) {
   if (!canManage) return;
   if (machineEditorDirty && !force) return;
   const machines = activeMachineConfigs();
-  if (!machineEditorNew && (!selectedMachineEditorId || !machines.some(machine => machine.id === selectedMachineEditorId))) selectedMachineEditorId = machines[0]?.id || null;
+  if (!selectedMachineEditorId || !machines.some(machine => machine.id === selectedMachineEditorId)) selectedMachineEditorId = machines[0]?.id || null;
   const select = $("#machineEditorSelect");
-  select.innerHTML = `${machineEditorNew ? '<option value="">+ Máy mới</option>' : ''}${machines.map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("")}`;
-  if (machineEditorNew) select.value = "";
-  else if (selectedMachineEditorId) select.value = selectedMachineEditorId;
+  select.innerHTML = machines.map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("");
+  if (selectedMachineEditorId) select.value = selectedMachineEditorId;
   const source = $("#duplicateMachineSource");
   source.innerHTML = machines.filter(machine => machine.id !== selectedMachineEditorId)
     .map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("");
@@ -1592,7 +1629,6 @@ function saveMachineAndLayout(form) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   cabinSnapshot = null;
   machineEditorDirty = false;
-  machineEditorNew = false;
   refreshOperationalSelects();
   renderMachineManager(true);
   renderAll();
@@ -1606,14 +1642,12 @@ function setupMachineManagerEvents() {
   $("#machineEditorSelect")?.addEventListener("change", event => {
     if (!confirmDiscardMachineDraft()) { event.target.value = selectedMachineEditorId || ""; return; }
     machineEditorDirty = false;
-    machineEditorNew = false;
     selectedMachineEditorId = event.target.value;
     renderMachineManager(true);
   });
   $("#newMachineBtn")?.addEventListener("click", () => {
     if (!confirmDiscardMachineDraft()) return;
     machineEditorDirty = false;
-    machineEditorNew = true;
     selectedMachineEditorId = null;
     renderMachineManager(true);
     $("#machineEditorForm input[name='name']")?.focus();
@@ -1644,7 +1678,6 @@ function setupMachineManagerEvents() {
     machine.archived = true;
     touchConfigRecord(machine);
     machineEditorDirty = false;
-    machineEditorNew = false;
     selectedMachineEditorId = null;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     refreshOperationalSelects(); renderMachineManager(true); renderAll(); queueAutoSync();
@@ -1711,24 +1744,7 @@ function mergeConfigRows(key, remoteRows) {
   const map = new Map((state[key] || []).map(item => [item.id, item]));
   remoteRows.forEach(row => {
     const local = map.get(row.id);
-    if (!local) {
-      map.set(row.id, { ...row, _sync: "synced" });
-      return;
-    }
-
-    // Do not let an older remote snapshot overwrite newer local data.
-    // The previous implementation used `local._sync !== "pending"` as an
-    // unconditional remote-win condition, so an old archived=true row from
-    // Supabase could make a machine disappear again on every sync.
-    if (local._sync === "pending") return;
-
-    const remoteTime = Date.parse(row.updated_at || "");
-    const localTime = Date.parse(local.updated_at || "");
-    const remoteIsNewer = Number.isFinite(remoteTime)
-      ? (!Number.isFinite(localTime) || remoteTime > localTime)
-      : (!local.updated_at && Boolean(row.updated_at));
-
-    if (remoteIsNewer) {
+    if (!local || String(row.updated_at || "") >= String(local.updated_at || "") || local._sync !== "pending") {
       map.set(row.id, { ...row, _sync: "synced" });
     }
   });
@@ -1854,17 +1870,23 @@ function ensureSyncView() {
 
 function renderOrders() {
   const machine = activeDashboardMachine;
-  const rows = buildOrderRows().filter(row => row.machine === machine);
+  const suggestedRows = buildOrderRows().filter(row => row.machine === machine);
+  const rows = adjustedOrderRows(suggestedRows);
   const attention = dashboardAttentionRows(machine);
   const packsTotal = totalPacks(rows);
   const exportMachines = nccMachinesWithOrders();
   orderSummaryText = rows.length ? `${formatMachineOrder(machine, rows)}\n\nTỔNG: ${packsTotal} THÙNG` : "";
-  $("#orderSummaryBox").innerHTML = rows.length ? `
-    <div class="dashboard-order-head"><div><span>Đơn nhập hàng ${htmlEscape(machine)}</span><b>${packsTotal} thùng</b></div><small>${rows.length} sản phẩm</small></div>
-    <div class="dashboard-order-list">${rows.map(row => {
+  $("#orderSummaryBox").innerHTML = suggestedRows.length ? `
+    <div class="dashboard-order-head"><div><span>Đơn nhập hàng ${htmlEscape(machine)}</span><b>${packsTotal} thùng</b></div><small>${rows.length}/${suggestedRows.length} sản phẩm</small></div>
+    <div class="dashboard-order-list">${suggestedRows.map(row => {
       const layout = row.slotCount > 1 ? `${row.slotCount} slot · sức chứa ${row.capacity}` : `Sức chứa ${row.capacity || "chưa đặt"}`;
       const storage = row.storageReason ? ` · ${htmlEscape(row.storageReason)}` : "";
-      return `<div class="dashboard-order-row"><span>${htmlEscape(row.product)}<small class="order-context">${layout} · tồn ${row.projected}${storage}</small></span><b>${row.pack.packs} thùng</b><small>${row.pack.qty} sản phẩm</small></div>`;
+      const adjusted = adjustedOrderRows([row])[0] || { pack: { packs: 0, qty: 0, packSize: row.pack.packSize } };
+      return `<div class="dashboard-order-row adjustable-order-row">
+        <span>${htmlEscape(row.product)}<small class="order-context">${layout} · tồn ${row.projected}${storage} · gợi ý ${row.pack.packs} thùng</small></span>
+        <label class="order-adjust-control"><input class="order-adjust-input" type="number" min="0" step="1" value="${Number(adjusted.pack.packs || 0)}" data-machine="${htmlEscape(row.machine)}" data-product="${htmlEscape(row.product)}" aria-label="Số thùng ${htmlEscape(row.product)}" /><small>thùng</small></label>
+        <small>${adjusted.pack.qty} sản phẩm</small>
+      </div>`;
     }).join("")}</div>
     <div class="excel-export-box"><div class="excel-export-head"><b>Xuất đơn nhập hàng</b><button type="button" id="selectAllNccMachines" class="mini">Chọn tất cả</button></div>
       <div id="nccExportMachines" class="machine-check-list">${exportMachines.map(name => `<label><input type="checkbox" value="${htmlEscape(name)}" ${name === machine ? "checked" : ""} /><span>${htmlEscape(name)}</span></label>`).join("")}</div>
@@ -1875,6 +1897,10 @@ function renderOrders() {
     return `<div class="attention-row ${level}"><div><b>${htmlEscape(item.product)}</b><span>${item.raw < 0 ? `Lệch ${Math.abs(item.raw)}` : `Tồn ${item.qty}`} sản phẩm</span></div><strong>${item.order > 0 ? `${item.pack.packs} thùng` : "Kiểm tra"}</strong></div>`;
   }).join("")}</div>` : `<div class="empty-state"><b>Không có tồn thấp</b><span>Máy này chưa có mục nào cần chú ý.</span></div>`;
   $("#exportNccXlsxBtn")?.addEventListener("click", exportNccXlsx);
+  $$(".order-adjust-input").forEach(input => input.addEventListener("change", () => {
+    saveOrderAdjustment(input.dataset.machine, input.dataset.product, input.value);
+    renderOrders();
+  }));
   $("#selectAllNccMachines")?.addEventListener("click", () => {
     const inputs = $$("#nccExportMachines input");
     const check = inputs.some(input => !input.checked);

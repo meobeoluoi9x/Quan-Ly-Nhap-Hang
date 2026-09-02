@@ -174,6 +174,10 @@ input[name=qty],input[name=actual],.pad-title,.summary-line span,.machine-title,
 .dashboard-order-row span,.attention-row b,.compact-info-row b{font-weight:900;min-width:0}
 .dashboard-order-row b,.dashboard-order-row small,.attention-row strong{text-align:right;font-variant-numeric:tabular-nums}
 .dashboard-order-row small,.attention-row span,.compact-info-row span{color:#64748b;font-size:12px;font-weight:800}
+.adjustable-order-row{grid-template-columns:minmax(0,1fr) 116px 86px}
+.order-adjust-control{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px}
+.order-adjust-control input{width:100%;min-width:0;height:42px;border:1px solid #bfdbfe;border-radius:10px;background:#fff;text-align:center;font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
+.order-adjust-control small{font-size:11px;text-align:left}
 .attention-row{grid-template-columns:minmax(0,1fr) 86px;border-left-width:6px}
 .attention-row>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .attention-row.red,.compact-info-row.red{border-left-color:#ef4444}
@@ -201,6 +205,8 @@ input[name=qty],input[name=actual],.pad-title,.summary-line span,.machine-title,
   .priority-box{align-items:flex-start;flex-direction:column}
   .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .dashboard-order-row{grid-template-columns:minmax(0,1fr) 70px 66px;padding:9px}
+  .adjustable-order-row{grid-template-columns:minmax(0,1fr) 104px 74px}
+  .order-adjust-control input{height:40px;font-size:16px}
   .dashboard-order-head{align-items:flex-start}
   .machine-check-list{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -353,7 +359,7 @@ main{max-width:1120px;padding:14px}
   .cabin-summary{grid-template-columns:1fr 1fr 1fr}
 }
 
-/* V5.4.13 */
+/* V5.4.11 */
 .operation-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 0 12px;padding:4px;border:1px solid #cbd5e1;border-radius:8px;background:#e2e8f0}
 .operation-tab{min-height:42px;padding:9px 10px;border-radius:6px;background:transparent;color:#334155;font-size:13px}
 .operation-tab.active{background:#0f172a;color:white}
@@ -425,7 +431,7 @@ main{max-width:1120px;padding:14px}
   .quick-fill-footer-actions{grid-template-columns:1fr}
 }
 
-/* V5.4.13 - professional operations UI */
+/* V5.4.11 - professional operations UI */
 :root{
   --bg:#f5f7fb;
   --surface:#ffffff;

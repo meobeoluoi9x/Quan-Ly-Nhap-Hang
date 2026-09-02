@@ -39,27 +39,6 @@ const context = vm.createContext({ console });
   "normalizeState",
   "stableConfigId",
 ].forEach(name => vm.runInContext(extractLastFunction(name), context));
-vm.runInContext(extractLastFunction("mergeConfigRows"), context);
-vm.runInContext(extractLastFunction("isAccessDeniedError"), context);
-assert.equal(context.isAccessDeniedError({ message: "Tài khoản chưa được quản trị viên cấp quyền" }), true);
-assert.equal(context.isAccessDeniedError({ message: "Failed to fetch" }), false);
-assert.equal(context.isAccessDeniedError({ message: "JWT expired" }), false);
-context.state = context.normalizeState({ machineConfigs: [
-  { id: "machine-d3", name: "Máy D3", archived: false, updated_at: "2026-08-10T02:00:00.000Z", _sync: "synced" }
-] });
-context.mergeConfigRows("machineConfigs", [
-  { id: "machine-d3", name: "Máy D3", archived: true, updated_at: "2026-08-10T01:00:00.000Z" }
-]);
-assert.equal(context.state.machineConfigs[0].archived, false, "older remote archived state must not hide D3");
-context.mergeConfigRows("machineConfigs", [
-  { id: "machine-d3", name: "Máy D3", archived: true, updated_at: "2026-08-10T03:00:00.000Z" }
-]);
-assert.equal(context.state.machineConfigs[0].archived, true, "newer remote state should still win");
-context.state.machineConfigs[0] = { id: "machine-d3", name: "Máy D3", archived: false, updated_at: "2026-08-10T04:00:00.000Z", _sync: "pending" };
-context.mergeConfigRows("machineConfigs", [
-  { id: "machine-d3", name: "Máy D3", archived: true, updated_at: "2026-08-10T05:00:00.000Z" }
-]);
-assert.equal(context.state.machineConfigs[0].archived, false, "pending local changes must not be overwritten by remote merge");
 
 [
   "defaultStorageRules",
@@ -143,9 +122,9 @@ assert.equal(draftContext.readFreshV42Draft("today").date, "2026-07-01");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
 assert.equal(new Set(ids).size, ids.length, "index.html contains duplicate ids");
-assert.match(html, /Quản Lý Nhập Hàng V5\.4\.13/);
-assert.match(html, /app\.js\?v=5\.4\.13/);
-runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=5\\.4\\.13`)));
+assert.match(html, /Quản Lý Nhập Hàng V5\.5\.0/);
+assert.match(html, /app\.js\?v=5\.5\.0/);
+runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=5\\.5\\.0`)));
 assert.match(html, /id="nccMachine"/);
 assert.match(html, /id="storageRuleForm"/);
 assert.match(html, /id="historyExportMachines"/);
@@ -163,12 +142,6 @@ assert.match(dashboardSource, /function renderCabin\(/);
 assert.match(dashboardSource, /function renderSelectedCabin\(/);
 assert.doesNotMatch(source, /function renderCabin\(/);
 assert.match(source, /function saveStorageRules\(/);
-assert.match(source, /var machineEditorNew = false;/);
-assert.match(source, /if \(!machineEditorNew && \(!selectedMachineEditorId/);
-assert.match(source, /machineEditorNew = true;/);
-assert.match(source, /machineEditorNew = false;/);
-assert.match(source, /Không kiểm tra được quyền — đang dùng quyền đã lưu/);
-assert.match(source, /function isAccessDeniedError\(/);
 assert.match(source, /product_storage_rules/);
 assert.match(orderSource, /storageLimited/);
 assert.doesNotMatch(source, /data-add-boxes|data-val=/);
@@ -241,14 +214,14 @@ assert.match(xlsxSource, /summarySource\(machine, slot, product\)/);
 assert.doesNotMatch(xlsxSource, /Doi chieu/);
 
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
-assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.4.13");
+assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.5.0");
 const serviceWorker = fs.readFileSync(path.join(root, "sw.js"), "utf8");
-assert.match(serviceWorker, /quan-ly-nhap-hang-v5-4-13/);
+assert.match(serviceWorker, /quan-ly-nhap-hang-v5-5-0/);
 runtimeModules.forEach(name => assert.match(serviceWorker, new RegExp(`\\./modules/${name.replace(".", "\\.")}`)));
 assert.doesNotMatch(extractLastFunctionFromSource(v42Source, "renderHistoryV4Runtime"), /onclick=/);
 assert.doesNotMatch(extractLastFunction("renderAudit"), /onclick=/);
 
-console.log("V5.4.13 smoke tests: PASS");
+console.log("V5.5.0 smoke tests: PASS");
 
 
 

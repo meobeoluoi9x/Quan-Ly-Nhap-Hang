@@ -1,4 +1,4 @@
-/* Quản Lý Nhập Hàng V5.4.13 - xlsx.js */
+/* Quản Lý Nhập Hàng V5.4.11 - xlsx.js */
 function xlsxEscape(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -177,16 +177,17 @@ function orderSheetRows(rows, title) {
 function exportNccXlsx() {
   if (!syncUser) return showToast("Cần đăng nhập để xuất Excel.");
   const machines = selectedNccExportMachines();
-  const rows = buildOrderRows().filter(row => machines.includes(row.machine));
+  const rows = adjustedOrderRows(buildOrderRows().filter(row => machines.includes(row.machine)));
   if (!machines.length) return showToast("Chưa chọn máy để xuất Excel.");
   if (!rows.length) return showToast("Các máy đã chọn chưa có sản phẩm cần nhập.");
   const grouped = groupOrdersByMachine(rows);
+  const productRows = groupOrdersByProduct(rows);
   const sheets = [{
-    name: "Tong hop",
-    rows: orderSheetRows(rows, `Đơn nhập hàng NCC - ${todayISO()}`),
+    name: "Tong hop san pham",
+    rows: orderSheetRows(productRows, `Tổng hợp đơn nhập hàng NCC - ${todayISO()}`),
     widths: [18, 28, 10, 12, 12, 18, 10, 18, 28],
     freezeTopRow: true,
-    autoFilter: `A4:I${rows.length + 5}`
+    autoFilter: `A4:I${productRows.length + 5}`
   }];
   machines.forEach(machine => {
     const machineRows = grouped[machine] || [];
