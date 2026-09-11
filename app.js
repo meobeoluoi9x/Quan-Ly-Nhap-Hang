@@ -1,4 +1,79 @@
-const APP_VERSION = "5.5.0";
+// --- BỘ ĐỆM AN TOÀN TRÁNH TRÀN BỘ NHỚ LOCALSTORAGE (QUOTA EXCEEDED) ---
+const StorageManager = {
+  MAX_LOCAL_LOGS: 80, // Giữ lại tối đa 80 log gần nhất mỗi loại trên máy
+
+  setItem(key, value) {
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    try {
+      localStorage.setItem(key, serialized);
+    } catch (e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22 || e.number === -2147024888) {
+        console.warn('[Storage] Quá hạn ngạch localStorage (5MB). Đang dọn dẹp bộ đệm...');
+        this.pruneCache();
+        
+        try {
+          // Thử lại lần 2
+          localStorage.setItem(key, serialized);
+        } catch (retryErr) {
+          console.warn('[Storage] Cắt tỉa sâu dữ liệu offline để tránh crash...');
+          this.deepPruneState();
+          try {
+            localStorage.setItem(key, typeof state !== 'undefined' ? JSON.stringify(state) : serialized);
+          } catch (fatal) {
+            console.error('[Storage] Không thể ghi dữ liệu cục bộ:', fatal);
+          }
+        }
+      } else {
+        console.error('[Storage] Lỗi lưu trữ:', e);
+      }
+    }
+  },
+
+  getItem(key, defaultValue = null) {
+    try {
+      const data = localStorage.getItem(key);
+      return data !== null ? data : defaultValue;
+    } catch (e) {
+      return defaultValue;
+    }
+  },
+
+  removeItem(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  },
+
+  // Dọn dẹp các key tạm, cache token và các bản lưu cũ
+  pruneCache() {
+    const obsoleteKeys = [
+      ...OLD_KEYS,
+      RECOVERY_BACKUP_KEY,
+      'supabase_sync_logs',
+      'temp_orders',
+      'debug_logs',
+      'export_cache'
+    ];
+    obsoleteKeys.forEach(k => localStorage.removeItem(k));
+  },
+
+  // Cắt tỉa sâu các log đã đồng bộ lên Supabase nếu máy bị đầy hẳn dung lượng
+  deepPruneState() {
+    if (typeof state === 'undefined') return;
+    ['fillLogs', 'nccLogs', 'adjustLogs'].forEach(key => {
+      if (Array.isArray(state[key]) && state[key].length > this.MAX_LOCAL_LOGS) {
+        // Ưu tiên giữ lại các record chưa sync (_sync === 'pending') và các record mới nhất
+        const pending = state[key].filter(item => item._sync === 'pending');
+        const synced = state[key].filter(item => item._sync !== 'pending').slice(-this.MAX_LOCAL_LOGS);
+        const map = new Map();
+        [...synced, ...pending].forEach(item => map.set(item.id, item));
+        state[key] = [...map.values()];
+      }
+    });
+  }
+};
+
+const APP_VERSION = "5.5.1";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -7,8 +82,6 @@ const DEVICE_ID_KEY = "fill_assistant_device_id";
 const ACCESS_CACHE_KEY = "fill_assistant_access";
 const ORDER_ADJUST_KEY = "qlnh_order_adjustments_v55";
 const DEFAULT_SUPABASE_URL = "https://ylopccoxnbhtmrghldpn.supabase.co";
-// Paste the public browser key here. Never paste sb_secret/service_role keys.
-// Optional light obfuscation: use "b64:" + base64 encoded publishable key.
 const DEFAULT_SUPABASE_KEY = "sb_publishable_uBeJmMkH-kjYBsT09ToR4w__JDc48K2";
 
 let deferredPrompt = null;
@@ -16,8 +89,8 @@ let lastAction = null;
 let editing = null;
 let orderSummaryText = "";
 let activeOrderMachine = null;
-let activeDashboardMachine = localStorage.getItem("fill_assistant_active_machine") || null;
-let activeCabinMachine = localStorage.getItem("fill_assistant_cabin_machine") || null;
+let activeDashboardMachine = StorageManager.getItem("fill_assistant_active_machine") || null;
+let activeCabinMachine = StorageManager.getItem("fill_assistant_cabin_machine") || null;
 let syncClient = null;
 let syncUser = null;
 let syncBusy = false;
@@ -44,10 +117,10 @@ function unique(list) {
 }
 
 function deviceId() {
-  let id = localStorage.getItem(DEVICE_ID_KEY);
+  let id = StorageManager.getItem(DEVICE_ID_KEY);
   if (!id) {
     id = makeId();
-    localStorage.setItem(DEVICE_ID_KEY, id);
+    StorageManager.setItem(DEVICE_ID_KEY, id);
   }
   return id;
 }
@@ -59,7 +132,7 @@ function syncConfig() {
     source: DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_KEY ? "built-in" : "local"
   };
   try {
-    const saved = JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY) || "{}");
+    const saved = JSON.parse(StorageManager.getItem(SYNC_CONFIG_KEY) || "{}");
     return {
       url: saved.url || defaults.url || "",
       key: saved.key || defaults.key || "",
@@ -71,7 +144,7 @@ function syncConfig() {
 }
 
 function saveSyncConfig(config) {
-  localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(config || {}));
+  StorageManager.setItem(SYNC_CONFIG_KEY, JSON.stringify(config || {}));
 }
 
 function decodeSupabaseKey(value) {
@@ -87,15 +160,15 @@ function decodeSupabaseKey(value) {
 }
 
 function readStoredState(key) {
-  const raw = localStorage.getItem(key);
+  const raw = StorageManager.getItem(key);
   if (!raw) return null;
   try {
     return normalizeState(JSON.parse(raw));
   } catch (error) {
     console.warn(`Không đọc được dữ liệu localStorage: ${key}`, error);
     try {
-      localStorage.setItem(RECOVERY_BACKUP_KEY, JSON.stringify({ sourceKey: key, savedAt: new Date().toISOString(), raw }));
-      localStorage.removeItem(key);
+      StorageManager.setItem(RECOVERY_BACKUP_KEY, JSON.stringify({ sourceKey: key, savedAt: new Date().toISOString(), raw }));
+      StorageManager.removeItem(key);
     } catch {}
     return null;
   }
@@ -108,13 +181,13 @@ function loadState() {
   for (const key of OLD_KEYS) {
     const old = readStoredState(key);
     if (old) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(old));
+      StorageManager.setItem(STORAGE_KEY, JSON.stringify(old));
       return old;
     }
   }
 
   const initial = normalizeState(window.FILL_STATE || {});
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+  StorageManager.setItem(STORAGE_KEY, JSON.stringify(initial));
   return initial;
 }
 
@@ -273,7 +346,7 @@ function totalPacks(rows) {
 
 function orderAdjustments() {
   try {
-    return JSON.parse(localStorage.getItem(ORDER_ADJUST_KEY) || "{}") || {};
+    return JSON.parse(StorageManager.getItem(ORDER_ADJUST_KEY) || "{}") || {};
   } catch {
     return {};
   }
@@ -307,7 +380,7 @@ function saveOrderAdjustment(machine, product, packs) {
   const suggestedPacks = Number(suggested?.pack?.packs || 0);
   if (value === suggestedPacks) delete adjustments[key];
   else adjustments[key] = value;
-  localStorage.setItem(ORDER_ADJUST_KEY, JSON.stringify(adjustments));
+  StorageManager.setItem(ORDER_ADJUST_KEY, JSON.stringify(adjustments));
 }
 
 function groupOrdersByProduct(rows) {
@@ -341,7 +414,6 @@ function groupOrdersByProduct(rows) {
   })).sort((a, b) => a.product.localeCompare(b.product, "vi"));
 }
 
-
 function groupOrdersByMachine(rows) {
   const groups = {};
   rows.forEach(row => {
@@ -356,7 +428,7 @@ function formatMachineOrder(machine, rows) {
   rows.forEach(row => {
     lines.push(`- ${row.product}: ${row.pack.packs} thùng (${row.pack.qty} ${row.pack.unit})${row.storageReason ? ` - ${row.storageReason}` : ""}`);
   });
-  return lines.join("\\n");
+  return lines.join("\n");
 }
 
 function copyText(text, message) {
@@ -394,7 +466,7 @@ function setupSelectsV4Runtime() {
   $("#stocktakeMachine")?.addEventListener("change", renderStocktake);
   $("#cabinMachine")?.addEventListener("change", event => {
     activeCabinMachine = event.target.value;
-    localStorage.setItem("fill_assistant_cabin_machine", activeCabinMachine);
+    StorageManager.setItem("fill_assistant_cabin_machine", activeCabinMachine);
     renderCabin();
   });
   $("#exportCabinXlsxBtn")?.addEventListener("click", exportCabinXlsx);
@@ -526,13 +598,13 @@ function ensureHeaderSyncLogin() {
   box.innerHTML = `
     <form id="headerSyncLoginForm" class="header-sync-form">
       <input name="email" type="email" autocomplete="email" placeholder="Email" />
-      <input name="password" type="password" autocomplete="current-password" placeholder="M&#7853;t kh&#7849;u" />
-      <button type="submit" class="btn small">&#272;&#259;ng nh&#7853;p</button>
+      <input name="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" />
+      <button type="submit" class="btn small">Đăng nhập</button>
     </form>
     <div id="headerSyncAccount" class="header-sync-account hidden">
       <span id="headerSyncEmail"></span>
       <button id="headerSyncNowBtn" class="btn small">Sync</button>
-      <button id="headerSyncLogoutBtn" class="btn small ghost">Tho&#225;t</button>
+      <button id="headerSyncLogoutBtn" class="btn small ghost">Thoát</button>
     </div>
   `;
   header.insertBefore(box, $("#installBtn"));
@@ -632,12 +704,12 @@ function importJSON(event) {
 
 /* V3.5.0 - consolidated workflow */
 let activeHistoryType = "fill";
-let lastSyncAt = localStorage.getItem("fill_assistant_last_sync_at") || "";
+let lastSyncAt = StorageManager.getItem("fill_assistant_last_sync_at") || "";
 let periodicSyncTimer = null;
 
 function loadCachedAccess() {
   try {
-    return JSON.parse(localStorage.getItem(ACCESS_CACHE_KEY) || "null");
+    return JSON.parse(StorageManager.getItem(ACCESS_CACHE_KEY) || "null");
   } catch {
     return null;
   }
@@ -645,8 +717,8 @@ function loadCachedAccess() {
 
 function cacheAccess(access) {
   syncAccess = access || null;
-  if (syncAccess) localStorage.setItem(ACCESS_CACHE_KEY, JSON.stringify(syncAccess));
-  else localStorage.removeItem(ACCESS_CACHE_KEY);
+  if (syncAccess) StorageManager.setItem(ACCESS_CACHE_KEY, JSON.stringify(syncAccess));
+  else StorageManager.removeItem(ACCESS_CACHE_KEY);
 }
 
 function hasPermission(permission) {
@@ -722,7 +794,7 @@ function markStatePending() {
 
 function saveState() {
   markStatePending();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
   renderAll();
   queueAutoSync();
 }
@@ -1268,13 +1340,13 @@ function seedMachineConfig() {
     slot_number: Number(slot.slot),
     product: slot.product,
     capacity: Number(slot.max || 0),
-    initial_machine: Number(slot.initialMachine || 0),
+    initial_machine: Number(slot.initial_machine || 0),
     archived: false,
     created_at: now,
     updated_at: now,
     _sync: "seeded"
   }));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function seedProductStorageRules() {
@@ -1301,7 +1373,7 @@ function seedProductStorageRules() {
     state.productStorageRules.push({ ...defaultRule, created_at: now, updated_at: now });
     changed = true;
   });
-  if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (changed) StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function activeMachineConfigs() {
@@ -1517,7 +1589,7 @@ function saveStorageRules() {
     delete rule.deleted_at;
     touchConfigRecord(rule);
   });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
   cabinSnapshot = null;
   renderStorageRuleManager();
   renderAll();
@@ -1626,7 +1698,7 @@ function saveMachineAndLayout(form) {
     delete slot.deleted_at;
     touchConfigRecord(slot);
   });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
   cabinSnapshot = null;
   machineEditorDirty = false;
   refreshOperationalSelects();
@@ -1679,7 +1751,7 @@ function setupMachineManagerEvents() {
     touchConfigRecord(machine);
     machineEditorDirty = false;
     selectedMachineEditorId = null;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
     refreshOperationalSelects(); renderMachineManager(true); renderAll(); queueAutoSync();
   });
   $("#duplicateLayoutBtn")?.addEventListener("click", () => {
@@ -1723,7 +1795,7 @@ function prepareLocalRowsForWorkspace() {
       changed = true;
     }));
   }
-  if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (changed) StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function pendingSyncCount() {
@@ -1809,9 +1881,9 @@ async function syncNow() {
     if (publicOnly) {
       for (const meta of syncTables()) replaceWithPublicRows(meta.key, await fetchAllSyncRows(meta, true));
       await syncMachineConfig(true);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
       lastSyncAt = new Date().toISOString();
-      localStorage.setItem("fill_assistant_last_sync_at", lastSyncAt);
+      StorageManager.setItem("fill_assistant_last_sync_at", lastSyncAt);
       syncStatusText = syncUser ? "Chưa được cấp quyền" : "Chỉ xem";
       refreshOperationalSelects();
       renderAll();
@@ -1827,9 +1899,9 @@ async function syncNow() {
       mergeRemoteRows(meta.key, await fetchAllSyncRows(meta));
     }
     await syncMachineConfig(false);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
     lastSyncAt = new Date().toISOString();
-    localStorage.setItem("fill_assistant_last_sync_at", lastSyncAt);
+    StorageManager.setItem("fill_assistant_last_sync_at", lastSyncAt);
     syncStatusText = "Đã đồng bộ";
     refreshOperationalSelects();
     renderAll();
@@ -1953,8 +2025,3 @@ function authoritativeState(incomingState) {
   });
   return result;
 }
-
-
-
-
-
