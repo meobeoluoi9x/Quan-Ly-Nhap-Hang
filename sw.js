@@ -1,4 +1,4 @@
-const CACHE_NAME = 'qlnh-cache-v5.5.2';
+const CACHE_NAME = 'qlnh-cache-v5.5.3';
 
 const ASSETS_TO_CACHE = [
   './',
