@@ -178,13 +178,13 @@ function loadState() {
   const saved = readStoredState(STORAGE_KEY);
   if (saved) return saved;
 
-  for (const key of OLD_KEYS) {
-    const old = readStoredState(key);
-    if (old) {
-      StorageManager.setItem(STORAGE_KEY, JSON.stringify(old));
-      return old;
-    }
-  }
+  // XÓA BỎ HOẶC COMMENT VÒNG LẶP OLD_KEYS:
+  // for (const key of OLD_KEYS) { ... }  <-- ĐÂY LÀ NGUYÊN NHÂN TỰ KÉO BẢN CŨ 1 THÁNG TRƯỚC
+
+  // Nếu không có dữ liệu, khởi tạo rỗng và để Supabase tự kéo về
+  const initial = normalizeState(window.FILL_STATE || {});
+  return initial;
+}
 
   const initial = normalizeState(window.FILL_STATE || {});
   StorageManager.setItem(STORAGE_KEY, JSON.stringify(initial));
