@@ -91,14 +91,6 @@ let orderSummaryText = "";
 let activeOrderMachine = null;
 let activeDashboardMachine = StorageManager.getItem("fill_assistant_active_machine") || null;
 let activeCabinMachine = StorageManager.getItem("fill_assistant_cabin_machine") || null;
-function ensureActiveMachine() {
-  const machines = config().machines;
-  if (!activeDashboardMachine && machines && machines.length > 0) {
-    activeDashboardMachine = machines[0].name;
-    StorageManager.setItem("fill_assistant_active_machine", activeDashboardMachine);
-  }
-  return activeDashboardMachine;
-}
 let syncClient = null;
 let syncUser = null;
 let syncBusy = false;
@@ -186,13 +178,13 @@ function loadState() {
   const saved = readStoredState(STORAGE_KEY);
   if (saved) return saved;
 
-  // XÓA BỎ HOẶC COMMENT VÒNG LẶP OLD_KEYS:
-  // for (const key of OLD_KEYS) { ... }  <-- ĐÂY LÀ NGUYÊN NHÂN TỰ KÉO BẢN CŨ 1 THÁNG TRƯỚC
-
-  // Nếu không có dữ liệu, khởi tạo rỗng và để Supabase tự kéo về
-  const initial = normalizeState(window.FILL_STATE || {});
-  return initial;
-}
+  for (const key of OLD_KEYS) {
+    const old = readStoredState(key);
+    if (old) {
+      StorageManager.setItem(STORAGE_KEY, JSON.stringify(old));
+      return old;
+    }
+  }
 
   const initial = normalizeState(window.FILL_STATE || {});
   StorageManager.setItem(STORAGE_KEY, JSON.stringify(initial));
@@ -1009,9 +1001,7 @@ function renderAudit() {
 }
 
 function renderSummary() {
-  ensureActiveMachine(); // <-- THÊM DÒNG NÀY
   const machine = activeDashboardMachine;
-  if (!machine) return;  // <-- THÊM DÒNG NÀY ĐỂ TRÁNH LỖI KHI CHƯA CÓ MÁY
   const negatives = negativeCabinItems().filter(item => item.machine === machine).length;
   const orders = buildOrderRows().filter(row => row.machine === machine);
   const packs = totalPacks(orders);
@@ -1951,9 +1941,7 @@ function ensureSyncView() {
 }
 
 function renderOrders() {
-  ensureActiveMachine(); // <-- THÊM DÒNG NÀY
   const machine = activeDashboardMachine;
-  if (!machine) return;  // <-- THÊM DÒNG NÀY ĐỂ TRÁNH LỖI KHI CHƯA CÓ MÁY
   const suggestedRows = buildOrderRows().filter(row => row.machine === machine);
   const rows = adjustedOrderRows(suggestedRows);
   const attention = dashboardAttentionRows(machine);
