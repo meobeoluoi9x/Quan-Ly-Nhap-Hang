@@ -62,77 +62,6 @@ function renderCabin() {
   }).join("") || `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
 }
 
-function quickFixNegative(machine, product, qty) {
-  if (!confirm(`Tạo điều chỉnh +${qty} cho ${machine} - ${product}?`)) return;
-
-  const item = { id: makeId(), date: todayISO(), machine, product, qty: Number(qty), reason: "Sửa cabin âm" };
-  state.adjustLogs.push(item);
-  lastAction = { type: "deleteAdjust", index: state.adjustLogs.length - 1, item };
-  saveState();
-  showToast("Đã tạo điều chỉnh.", true);
-}
-
-function renderDashboardCabinAudit() {
-  const machine = activeDashboardMachine;
-  const cab = displayCabin();
-  const items = Object.entries(cab)
-    .map(([key, qty]) => {
-      const [m, product] = key.split("||");
-      return { machine: m, product, qty };
-    })
-    .filter(item => item.machine === machine)
-    .sort((a, b) => a.product.localeCompare(b.product, "vi"));
-
-  const box = $("#dashboardCabinAuditBox");
-  if (!box) return;
-
-  box.innerHTML = items.length ? `
-    <div class="cabin-audit-list">
-      ${items.map(item => `
-        <div class="cabin-audit-row" data-machine="${item.machine}" data-product="${item.product}" data-current="${item.qty}">
-          <div>
-            <b>${item.product}</b>
-            <span>Hiện tại: ${item.qty} ${unitName(item.product)}</span>
-          </div>
-          <input type="number" min="0" step="1" inputmode="numeric" value="${item.qty}" />
-          <button class="mini save-audit">Lưu</button>
-        </div>
-      `).join("")}
-    </div>
-  ` : `<p class="muted">Máy này chưa có dữ liệu cabin.</p>`;
-
-  $$(".save-audit", box).forEach(button => {
-    button.addEventListener("click", () => {
-      const row = button.closest(".cabin-audit-row");
-      const machine = row.dataset.machine;
-      const product = row.dataset.product;
-      const current = Number(row.dataset.current || 0);
-      const actual = Number($("input", row).value || 0);
-      const diff = actual - current;
-
-      if (diff === 0) {
-        showToast(`${product}: không có chênh lệch.`);
-        return;
-      }
-
-      const item = {
-        id: makeId(),
-        date: todayISO(),
-        machine,
-        product,
-        qty: diff,
-        reason: "Kiểm kê"
-      };
-
-      state.adjustLogs.push(item);
-      lastAction = { type: "deleteAdjust", index: state.adjustLogs.length - 1, item };
-      saveState();
-      $("#dashboardCabinAuditCard").classList.remove("hidden");
-      showToast(`Đã điều chỉnh ${product}: ${diff > 0 ? "+" : ""}${diff}.`, true);
-    });
-  });
-}
-
 function machineHealth(machine) {
   const rows = buildOrderRows().filter(row => row.machine === machine);
   const hasNegative = negativeCabinItems().some(item => item.machine === machine);
@@ -152,7 +81,7 @@ function renderSlow() {
   const rows = pairs.map(key => {
     const [machineName, product] = key.split("||");
     const total30 = getRecentFill(product, machineName, 30);
-    const count = state.fillLogs.filter(log => log.machine === machineName && log.product === product).length;
+    const count = fillStatsByMachineProduct(30).get(key)?.count || 0;
 
     let cls = "blue";
     let status = `Đang học (${count}/5 lần fill)`;

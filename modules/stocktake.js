@@ -1,13 +1,16 @@
 /* Quản Lý Nhập Hàng V5.4.11 - stocktake.js */
 function stocktakeItems(machine) {
-  const cabin = displayCabin();
+  const cabin = currentCabin();
   const products = new Set(config().slots.filter(slot => slot.machine === machine).map(slot => slot.product));
   Object.keys(cabin).forEach(key => {
     const [rowMachine, product] = key.split("||");
     if (rowMachine === machine) products.add(product);
   });
-  return [...products].map(product => ({ product, qty: Number(cabin[`${machine}||${product}`] || 0) }))
-    .sort((a, b) => a.product.localeCompare(b.product, "vi"));
+  return [...products].map(product => {
+    const raw = Number(cabin[`${machine}||${product}`] || 0);
+    // qty là số hiển thị (không âm); raw là tồn tính toán thật, dùng để tính chênh lệch kiểm kê.
+    return { product, qty: Math.max(0, raw), raw };
+  }).sort((a, b) => a.product.localeCompare(b.product, "vi"));
 }
 
 function renderStocktake() {
@@ -17,8 +20,8 @@ function renderStocktake() {
   const items = stocktakeItems(machine);
   box.innerHTML = items.length ? `
     <div class="stocktake-list">${items.map(item => `
-      <label class="stocktake-row" data-product="${htmlEscape(item.product)}" data-current="${item.qty}">
-        <span><b>${htmlEscape(item.product)}</b><small>Tồn hệ thống: ${item.qty} sản phẩm</small></span>
+      <label class="stocktake-row" data-product="${htmlEscape(item.product)}" data-current="${item.raw}">
+        <span><b>${htmlEscape(item.product)}</b><small>Tồn hệ thống: ${item.qty} sản phẩm${item.raw < 0 ? ` · lệch ${Math.abs(item.raw)}, nhập tồn thực tế để sửa` : ""}</small></span>
         <input type="number" min="0" step="1" inputmode="numeric" placeholder="Giữ ${item.qty}" />
       </label>`).join("")}</div>
     <div id="stocktakePreview" class="stocktake-preview">Ô để trống sẽ giữ nguyên tồn hiện tại.</div>
