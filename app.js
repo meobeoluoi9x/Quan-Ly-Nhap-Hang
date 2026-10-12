@@ -195,6 +195,39 @@ function readStoredState(key) {
   }
 }
 
+// Dữ liệu gốc trong data.js (Fill/NCC ngày 25). Tên biến cũ là FILL_STATE nên giữ làm dự phòng.
+function initialSeedSource() {
+  return window.FILL_INITIAL_STATE || window.FILL_STATE || {};
+}
+
+// Mốc thời gian cố định, cũ hơn mọi bản ghi trên Supabase: nếu cloud đã có cùng id (kể cả đã xóa)
+// thì bản cloud luôn thắng khi gộp, dữ liệu gốc không thể ghi đè hay làm sống lại bản ghi đã xóa.
+const SEED_TIMESTAMP = "2026-06-25T00:00:00.000Z";
+
+function initialSeedState() {
+  const seed = normalizeState(JSON.parse(JSON.stringify(initialSeedSource())));
+  ["fillLogs", "nccLogs", "adjustLogs"].forEach(key => {
+    seed[key].forEach(item => {
+      item.created_at ||= SEED_TIMESTAMP;
+      item.updated_at ||= SEED_TIMESTAMP;
+      item._sync = "seeded";
+    });
+  });
+  return seed;
+}
+
+// Sau khi tải dữ liệu cloud: bản ghi gốc mà cloud chưa có thì đánh dấu chờ đồng bộ để đẩy lên.
+function promoteSeededRows(key, remoteRows) {
+  const remoteIds = new Set(remoteRows.map(row => row.id));
+  let promoted = 0;
+  state[key].forEach(item => {
+    if (item._sync !== "seeded" || remoteIds.has(item.id)) return;
+    touchRecord(item, Boolean(item.deleted_at));
+    promoted += 1;
+  });
+  return promoted;
+}
+
 function loadState() {
   const saved = readStoredState(STORAGE_KEY);
   if (saved) return saved;
@@ -207,7 +240,7 @@ function loadState() {
     }
   }
 
-  const initial = normalizeState(window.FILL_STATE || {});
+  const initial = initialSeedState();
   StorageManager.setItem(STORAGE_KEY, JSON.stringify(initial));
   return initial;
 }
@@ -1307,7 +1340,7 @@ function setupForms() {
     if (!confirm("Reset về dữ liệu gốc trên thiết bị và Supabase?")) return;
     if (!navigator.onLine) return showToast("Cần kết nối mạng để reset dữ liệu Supabase.");
     if (!await syncNow()) return showToast("Chưa tải được dữ liệu Supabase. Hãy thử lại.");
-    state = authoritativeState(window.FILL_STATE || {});
+    state = authoritativeState(initialSeedSource());
     state.machineConfigs = [];
     state.machineSlots = [];
     state.productStorageRules = [];
@@ -1592,7 +1625,8 @@ function prepareLocalRowsForWorkspace() {
   let changed = false;
   ["fillLogs", "nccLogs", "adjustLogs"].forEach(key => {
     state[key].forEach(item => {
-      if (item.workspace_id) return;
+      // Bản ghi gốc chỉ được đẩy lên sau khi biết cloud chưa có (xem promoteSeededRows).
+      if (item.workspace_id || item._sync === "seeded") return;
       stampRecordOwner(item);
       item._sync = "pending";
       changed = true;
@@ -1682,6 +1716,7 @@ async function syncNow() {
     return false;
   }
   let succeeded = false;
+  let needsFollowUpSync = false;
   syncBusy = true;
   syncStatusText = "Đang đồng bộ";
   renderSyncStatus();
@@ -1707,13 +1742,16 @@ async function syncNow() {
         await upsertPendingRows(meta, pending);
         pending.forEach(item => { item._sync = "synced"; });
       }
-      mergeRemoteRows(meta.key, await fetchAllSyncRows(meta));
+      const remoteRows = await fetchAllSyncRows(meta);
+      mergeRemoteRows(meta.key, remoteRows);
+      if (hasPermission(meta.permission) && promoteSeededRows(meta.key, remoteRows)) needsFollowUpSync = true;
     }
     await syncMachineConfig(false);
     StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
     lastSyncAt = new Date().toISOString();
     StorageManager.setItem("fill_assistant_last_sync_at", lastSyncAt);
     syncStatusText = "Đã đồng bộ";
+    if (needsFollowUpSync) setTimeout(queueAutoSync, 0);
     refreshOperationalSelects();
     renderAll();
     succeeded = true;

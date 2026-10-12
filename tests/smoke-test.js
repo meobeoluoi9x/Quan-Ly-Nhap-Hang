@@ -232,6 +232,10 @@ vm.runInContext(extractLastFunctionFromSource(stocktakeSource, "stocktakeItems")
 jsonEqual(stocktakeContext.stocktakeItems("D3"), [{ product: "Aqua", qty: 0, raw: -5 }, { product: "Pepsi", qty: 7, raw: 7 }]);
 assert.match(stocktakeSource, /data-current="\$\{item\.raw\}"/);
 
+assert.match(source, /window\.FILL_INITIAL_STATE \|\| window\.FILL_STATE/);
+assert.match(source, /function promoteSeededRows\(/);
+assert.match(fs.readFileSync(path.join(root, "data.js"), "utf8"), /window\.FILL_INITIAL_STATE = /);
+
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
 assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.5.2");
 const serviceWorker = fs.readFileSync(path.join(root, "sw.js"), "utf8");
