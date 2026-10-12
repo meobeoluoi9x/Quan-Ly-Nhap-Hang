@@ -15,10 +15,14 @@ const StorageManager = {
           // Thử lại lần 2
           localStorage.setItem(key, serialized);
         } catch (retryErr) {
+          // Chỉ cắt tỉa log khi đang ghi chính dữ liệu app; các khóa khác giữ nguyên giá trị cần ghi.
+          if (key !== STORAGE_KEY || !this.deepPruneState()) {
+            console.error('[Storage] Không thể ghi dữ liệu cục bộ:', retryErr);
+            return;
+          }
           console.warn('[Storage] Cắt tỉa sâu dữ liệu offline để tránh crash...');
-          this.deepPruneState();
           try {
-            localStorage.setItem(key, typeof state !== 'undefined' ? JSON.stringify(state) : serialized);
+            localStorage.setItem(key, JSON.stringify(state));
           } catch (fatal) {
             console.error('[Storage] Không thể ghi dữ liệu cục bộ:', fatal);
           }
@@ -59,7 +63,8 @@ const StorageManager = {
 
   // Cắt tỉa sâu các log đã đồng bộ lên Supabase nếu máy bị đầy hẳn dung lượng
   deepPruneState() {
-    if (typeof state === 'undefined') return;
+    // `state` là biến let: đọc trước khi khởi tạo (lúc loadState) sẽ ném lỗi, nên kiểm tra cờ trước.
+    if (!appStateReady) return false;
     ['fillLogs', 'nccLogs', 'adjustLogs'].forEach(key => {
       if (Array.isArray(state[key]) && state[key].length > this.MAX_LOCAL_LOGS) {
         // Ưu tiên giữ lại các record chưa sync (_sync === 'pending') và các record mới nhất
@@ -70,10 +75,14 @@ const StorageManager = {
         state[key] = [...map.values()];
       }
     });
+    invalidateDerived();
+    return true;
   }
 };
 
-const APP_VERSION = "5.5.1";
+var appStateReady = false;
+
+const APP_VERSION = "5.5.2";
 const STORAGE_KEY = "fill_assistant_v32";
 const RECOVERY_BACKUP_KEY = "fill_assistant_recovery_backup";
 const OLD_KEYS = ["fill_assistant_v31","fill_assistant_v30","fill_assistant_v24","fill_assistant_v23","fill_assistant_v22","fill_assistant_v21","fill_assistant_v2_production","fill_assistant_v2","fill_assistant_v1","fill_assistant_v1_edit_undo","fill_assistant_v0"];
@@ -98,6 +107,18 @@ let syncStatusText = "Chưa cấu hình";
 let syncAccess = loadCachedAccess();
 let authListenerReady = false;
 let cabinSnapshot = null;
+// Bộ nhớ đệm cho các phép tính dẫn xuất từ state (config, tên máy chuẩn, đơn đặt hàng...).
+// Mọi chỗ thay đổi state đều gọi invalidateDerived() (qua touchRecord, saveState, merge...).
+let derivedCache = null;
+
+function invalidateDerived() {
+  cabinSnapshot = null;
+  derivedCache = null;
+}
+
+function derived() {
+  return derivedCache ||= {};
+}
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -174,6 +195,39 @@ function readStoredState(key) {
   }
 }
 
+// Dữ liệu gốc trong data.js (Fill/NCC ngày 25). Tên biến cũ là FILL_STATE nên giữ làm dự phòng.
+function initialSeedSource() {
+  return window.FILL_INITIAL_STATE || window.FILL_STATE || {};
+}
+
+// Mốc thời gian cố định, cũ hơn mọi bản ghi trên Supabase: nếu cloud đã có cùng id (kể cả đã xóa)
+// thì bản cloud luôn thắng khi gộp, dữ liệu gốc không thể ghi đè hay làm sống lại bản ghi đã xóa.
+const SEED_TIMESTAMP = "2026-06-25T00:00:00.000Z";
+
+function initialSeedState() {
+  const seed = normalizeState(JSON.parse(JSON.stringify(initialSeedSource())));
+  ["fillLogs", "nccLogs", "adjustLogs"].forEach(key => {
+    seed[key].forEach(item => {
+      item.created_at ||= SEED_TIMESTAMP;
+      item.updated_at ||= SEED_TIMESTAMP;
+      item._sync = "seeded";
+    });
+  });
+  return seed;
+}
+
+// Sau khi tải dữ liệu cloud: bản ghi gốc mà cloud chưa có thì đánh dấu chờ đồng bộ để đẩy lên.
+function promoteSeededRows(key, remoteRows) {
+  const remoteIds = new Set(remoteRows.map(row => row.id));
+  let promoted = 0;
+  state[key].forEach(item => {
+    if (item._sync !== "seeded" || remoteIds.has(item.id)) return;
+    touchRecord(item, Boolean(item.deleted_at));
+    promoted += 1;
+  });
+  return promoted;
+}
+
 function loadState() {
   const saved = readStoredState(STORAGE_KEY);
   if (saved) return saved;
@@ -186,12 +240,13 @@ function loadState() {
     }
   }
 
-  const initial = normalizeState(window.FILL_STATE || {});
+  const initial = initialSeedState();
   StorageManager.setItem(STORAGE_KEY, JSON.stringify(initial));
   return initial;
 }
 
 let state = loadState();
+appStateReady = true;
 
 function makeId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -219,110 +274,6 @@ function getCabinQty(machine, product) {
   return Math.max(0, Number(currentCabin()[`${machine}||${product}`] || 0));
 }
 
-function setupSelectsV4() {
-  $$('input[type="date"]').forEach(input => { if (!input.value) input.value = todayISO(); });
-
-  const machines = config().machines.map(machine => machine.name);
-  const products = unique([
-    ...Object.keys(config().products || {}),
-    ...config().slots.map(slot => slot.product),
-    ...config().initialCabin.map(item => item.product)
-  ]).sort((a, b) => a.localeCompare(b, "vi"));
-
-  $$('select[name="machine"]').forEach(select => {
-    select.innerHTML = machines.map(machine => `<option>${machine}</option>`).join("\n\n");
-  });
-
-  $$("#nccForm select[name='product'], #adjustForm select[name='product'], #stocktakeForm select[name='product']").forEach(select => {
-    select.innerHTML = products.map(product => `<option>${product}</option>`).join("");
-  });
-
-  const quickMachine = $("#quickMachine");
-  quickMachine.innerHTML = machines.map(machine => `<option>${machine}</option>`).join("");
-  quickMachine.addEventListener("change", renderQuickFill);
-
-  updateSlotOptions();
-}
-
-function updateSlotOptions() {
-  const machine = $("#fillForm select[name='machine']").value;
-  const slots = config().slots
-    .filter(slot => slot.machine === machine)
-    .sort((a, b) => Number(a.slot) - Number(b.slot));
-
-  $("#fillForm select[name='slot']").innerHTML = slots
-    .map(slot => `<option value="${slot.slot}">${slot.slot}</option>`)
-    .join("");
-
-  updateProductFromSlot();
-}
-
-function updateProductFromSlot() {
-  const machine = $("#fillForm select[name='machine']").value;
-  const slot = Number($("#fillForm select[name='slot']").value);
-  const found = config().slots.find(item => item.machine === machine && Number(item.slot) === slot);
-  $("#fillForm input[name='product']").value = found ? found.product : "";
-}
-
-function confirmLargeQty(qty, kind) {
-  if (qty >= 100) return confirm(`Bạn vừa nhập ${qty}. Số lượng khá lớn, có chắc không?`);
-  if (kind === "fill" && qty > 50) return confirm(`Bạn vừa fill ${qty}. Có chắc không?`);
-  return true;
-}
-
-function saveFillFromForm(form) {
-  const qty = Number(form.qty.value);
-  if (!confirmLargeQty(qty, "fill")) return;
-
-  const item = {
-    id: editing?.type === "fill" ? editing.id : makeId(),
-    date: form.date.value,
-    machine: form.machine.value,
-    slot: Number(form.slot.value),
-    product: form.product.value,
-    qty
-  };
-
-  if (editing?.type === "fill") {
-    state.fillLogs[editing.index] = item;
-    lastAction = { type: "editFill", index: editing.index, oldItem: editing.oldItem };
-    editing = null;
-    form.querySelector("button[type='submit']").textContent = "Lưu fill";
-    showToast("Đã cập nhật Fill.", true);
-  } else {
-    state.fillLogs.push(item);
-    showToast("Đã lưu Fill.");
-  }
-
-  form.qty.value = "";
-  saveState();
-}
-
-function saveAdjustFromForm(form) {
-  const item = {
-    id: editing?.type === "adjust" ? editing.id : makeId(),
-    date: form.date.value,
-    machine: form.machine.value,
-    product: form.product.value,
-    qty: Number(form.qty.value),
-    reason: form.reason.value
-  };
-
-  if (editing?.type === "adjust") {
-    state.adjustLogs[editing.index] = item;
-    lastAction = { type: "editAdjust", index: editing.index, oldItem: editing.oldItem };
-    editing = null;
-    form.querySelector("button[type='submit']").textContent = "Lưu điều chỉnh";
-    showToast("Đã cập nhật điều chỉnh.", true);
-  } else {
-    state.adjustLogs.push(item);
-    showToast("Đã lưu điều chỉnh.");
-  }
-
-  form.qty.value = "";
-  saveState();
-}
-
 function showToast(message, undoable = false) {
   let toast = $("#toast");
   if (!toast) {
@@ -331,10 +282,17 @@ function showToast(message, undoable = false) {
     document.body.appendChild(toast);
   }
 
-  toast.innerHTML = `${message}${undoable ? ' <button id="undoBtn">Hoàn tác</button>' : ""}`;
+  // Dùng textContent: thông báo có thể chứa tên sản phẩm hoặc lỗi từ server, không được hiểu là HTML.
+  toast.textContent = String(message ?? "");
+  if (undoable) {
+    const undo = document.createElement("button");
+    undo.id = "undoBtn";
+    undo.type = "button";
+    undo.textContent = "Hoàn tác";
+    undo.onclick = undoLastAction;
+    toast.append(" ", undo);
+  }
   toast.className = "show";
-
-  if (undoable) $("#undoBtn").onclick = undoLastAction;
 
   clearTimeout(window.toastTimer);
   window.toastTimer = setTimeout(() => toast.className = "", 5000);
@@ -437,19 +395,38 @@ function copyText(text, message) {
     return;
   }
 
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => showToast(message || "Đã copy."));
-  } else {
-    showToast(text);
-  }
+  const done = () => showToast(message || "Đã copy.");
+  const fallback = () => {
+    // Clipboard API cần HTTPS và quyền; khi bị chặn thì dùng cách copy cũ qua textarea ẩn.
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(area);
+    area.select();
+    let copied = false;
+    try { copied = document.execCommand("copy"); } catch {}
+    area.remove();
+    if (copied) done();
+    else showToast("Trình duyệt chặn copy. Hãy chọn và copy đơn thủ công.");
+  };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
+}
+
+function downloadBlob(blob, filename) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Thu hồi ngay sau click làm hỏng tải file trên Safari/iOS, nên đợi trình duyệt bắt đầu tải.
+  setTimeout(() => URL.revokeObjectURL(link.href), 30000);
 }
 
 function machineOptionsHtml(selected = "") {
   return config().machines.map(machine => `<option value="${htmlEscape(machine.name)}" ${machine.name === selected ? "selected" : ""}>${htmlEscape(machine.name)}</option>`).join("");
-}
-
-function productOptionsHtml(selected = "") {
-  return allProducts().map(product => `<option value="${htmlEscape(product)}" ${product === selected ? "selected" : ""}>${htmlEscape(product)}</option>`).join("");
 }
 
 function setupSelectsV4Runtime() {
@@ -478,57 +455,6 @@ function localISODate(date) {
   return copy.toISOString().slice(0, 10);
 }
 
-function addNccRow(values = {}) {
-  const box = $("#bulkNccRows");
-  if (!box) return;
-  const row = document.createElement("div");
-  row.className = "bulk-ncc-row";
-  row.innerHTML = `
-    <select class="bulk-machine" aria-label="Máy">${machineOptionsHtml(values.machine || activeDashboardMachine || "")}</select>
-    <select class="bulk-product" aria-label="Sản phẩm">${productOptionsHtml(values.product || "")}</select>
-    <div class="bulk-box-control">
-      <input class="bulk-boxes" type="number" min="0" step="1" inputmode="numeric" value="${Number(values.boxes || 0) || ""}" aria-label="Số thùng" />
-    </div>
-    <button type="button" class="remove-row-btn" data-remove-ncc-row aria-label="Xóa dòng">×</button>`;
-  box.appendChild(row);
-  updateNccBatchPreview();
-}
-
-function collectNccBatchRows(positiveOnly = false) {
-  return $$(".bulk-ncc-row", $("#bulkNccRows")).map(row => ({
-    row,
-    machine: $(".bulk-machine", row).value,
-    product: $(".bulk-product", row).value,
-    boxes: Number($(".bulk-boxes", row).value || 0)
-  })).filter(item => !positiveOnly || item.boxes > 0);
-}
-
-function mergedNccBatchRows() {
-  const merged = new Map();
-  collectNccBatchRows(true).forEach(item => {
-    const key = `${item.machine}||${item.product}`;
-    if (!merged.has(key)) merged.set(key, { machine: item.machine, product: item.product, boxes: 0 });
-    merged.get(key).boxes += item.boxes;
-  });
-  return [...merged.values()];
-}
-
-function updateNccBatchPreview() {
-  const rows = mergedNccBatchRows();
-  const boxes = rows.reduce((sum, item) => sum + item.boxes, 0);
-  const products = rows.reduce((sum, item) => sum + item.boxes * productInfo(item.product).pack, 0);
-  if ($("#nccBatchPreview")) $("#nccBatchPreview").innerHTML = `
-    <div><span>Dòng sau gộp</span><b>${rows.length}</b></div>
-    <div><span>Tổng thùng</span><b>${boxes}</b></div>
-    <div><span>Quy đổi</span><b>${products} sản phẩm</b></div>`;
-}
-
-function resetNccBatch() {
-  if (!$("#bulkNccRows")) return;
-  $("#bulkNccRows").innerHTML = "";
-  addNccRow();
-}
-
 function setHistoryRange(days) {
   const end = new Date();
   const start = new Date();
@@ -545,15 +471,6 @@ function historyDayLabel(date) {
   if (date === localISODate(yesterday)) return "Hôm qua";
   const parsed = new Date(`${date}T00:00:00`);
   return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString("vi-VN");
-}
-
-function downloadCsvFile(rows, filename) {
-  const csv = "\ufeff" + rows.map(row => row.map(csvCell).join(",")).join("\r\n");
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(link.href);
 }
 
 function htmlEscape(value) {
@@ -574,40 +491,8 @@ function selectedNccExportMachines() {
   return $$("#nccExportMachines input:checked").map(input => input.value);
 }
 
-function csvCell(value) {
-  let text = String(value ?? "");
-  if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return `"${text.replace(/"/g, '""')}"`;
-}
-
 function isSyncAdminMode() {
   return new URLSearchParams(location.search).get("admin") === "1";
-}
-
-function hasBuiltInSyncConfig() {
-  return Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_KEY);
-}
-
-function ensureHeaderSyncLogin() {
-  if (!hasBuiltInSyncConfig() || $("#headerSyncLogin")) return;
-  const header = $(".app-header");
-  if (!header) return;
-  const box = document.createElement("div");
-  box.id = "headerSyncLogin";
-  box.className = "header-sync-login";
-  box.innerHTML = `
-    <form id="headerSyncLoginForm" class="header-sync-form">
-      <input name="email" type="email" autocomplete="email" placeholder="Email" />
-      <input name="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" />
-      <button type="submit" class="btn small">Đăng nhập</button>
-    </form>
-    <div id="headerSyncAccount" class="header-sync-account hidden">
-      <span id="headerSyncEmail"></span>
-      <button id="headerSyncNowBtn" class="btn small">Sync</button>
-      <button id="headerSyncLogoutBtn" class="btn small ghost">Thoát</button>
-    </div>
-  `;
-  header.insertBefore(box, $("#installBtn"));
 }
 
 function loadSupabaseScript() {
@@ -646,6 +531,7 @@ function mergeRemoteRows(key, rows) {
     }
   });
   state[key] = [...localMap.values()];
+  invalidateDerived();
 }
 
 function replaceWithPublicRows(key, rows) {
@@ -655,6 +541,7 @@ function replaceWithPublicRows(key, rows) {
     if (!remote || String(item.updated_at || "") > String(remote.updated_at || "")) remoteMap.set(item.id, item);
   });
   state[key] = [...remoteMap.values()];
+  invalidateDerived();
 }
 
 let syncTimer = null;
@@ -776,6 +663,7 @@ function touchRecord(item, deleted = false) {
   stampRecordOwner(item);
   item._sync = "pending";
   if (deleted) item.deleted_at = now;
+  invalidateDerived();
   return item;
 }
 
@@ -793,6 +681,7 @@ function markStatePending() {
 }
 
 function saveState() {
+  invalidateDerived();
   markStatePending();
   StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
   renderAll();
@@ -833,23 +722,6 @@ function activateDashboardTab(name) {
   });
 }
 
-function activateView(name) {
-  const requestedTab = $(`.tab[data-view="${name}"]`);
-  if (requestedTab?.dataset.authRequired && !(syncUser || syncAccess)) {
-    openAuthModal();
-    return;
-  }
-  if (requestedTab?.dataset.permission && !requirePermission(requestedTab.dataset.permission)) return;
-  $$(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.view === name));
-  $$(".view").forEach(view => view.classList.toggle("active", view.id === name));
-  if (name === "audit") renderStocktake();
-  if (name === "cabin") renderCabin();
-  if (name === "history") renderHistory();
-  if (name === "system" && hasPermission("manage")) renderMembers();
-  closeDrawer();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
 function setupTabs() {
   $$(".tab").forEach(button => button.addEventListener("click", () => activateView(button.dataset.view)));
   $("#menuToggle")?.addEventListener("click", openDrawer);
@@ -877,45 +749,6 @@ function allProducts() {
 function nccBoxes(item) {
   const pack = productInfo(item.product).pack;
   return Number(item.boxes ?? Math.round(Number(item.qty || 0) / pack));
-}
-
-function updateNccConversion() {
-  const form = $("#nccForm");
-  const boxes = Number(form.qty.value || 0);
-  const total = boxes * productInfo(form.product.value).pack;
-  $("#nccConversion").textContent = `${boxes} thùng = ${total} sản phẩm`;
-}
-
-function setupQuickPads() {
-  $$(".quickPad").forEach(pad => {
-    pad.innerHTML = "";
-    pad.addEventListener("click", event => {
-      const button = event.target.closest("button");
-      if (!button) return;
-      const input = $("#" + pad.dataset.target + " input[name='qty']");
-      input.value = Number(input.value || 0) + Number(button.dataset.val || 0);
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-  });
-}
-
-function saveNccFromForm(form) {
-  if (!requirePermission("receive")) return;
-  const boxes = Number(form.qty.value);
-  if (!Number.isInteger(boxes) || boxes <= 0) {
-    showToast("Số thùng phải là số nguyên lớn hơn 0.");
-    return;
-  }
-  const item = touchRecord({
-    id: makeId(), date: form.date.value, machine: form.machine.value,
-    product: form.product.value, boxes, qty: boxes * productInfo(form.product.value).pack,
-    recorded_at: new Date().toISOString()
-  });
-  state.nccLogs.push(item);
-  form.qty.value = "";
-  updateNccConversion();
-  saveState();
-  showToast(`Đã lưu ${boxes} thùng = ${item.qty} sản phẩm.`);
 }
 
 function historyDateTime(item) {
@@ -946,17 +779,6 @@ function editNcc(id) {
   if (!Number.isInteger(boxes) || boxes < 0) return showToast("Số thùng không hợp lệ.");
   item.boxes = boxes; item.qty = boxes * productInfo(item.product).pack;
   touchRecord(item); saveState(); showToast("Đã cập nhật Nhập hàng.");
-}
-
-function editAdjust(id) {
-  if (!requirePermission("stocktake")) return;
-  const item = state.adjustLogs.find(row => row.id === id && !row.deleted_at);
-  if (!item) return;
-  const value = prompt("Chênh lệch kiểm kê theo sản phẩm:", item.qty);
-  if (value === null) return;
-  const qty = Number(value);
-  if (!Number.isFinite(qty)) return showToast("Số lượng không hợp lệ.");
-  item.qty = qty; touchRecord(item); saveState(); showToast("Đã cập nhật kiểm kê cabin.");
 }
 
 function deleteHistoryRecord(key, id, label) {
@@ -1144,7 +966,8 @@ function updateMemberRoleForm() {
 }
 
 async function saveMemberPermissions(form) {
-  if (!requirePermission("manage") || !navigator.onLine) return showToast("Cần có mạng để cập nhật quyền.");
+  if (!requirePermission("manage")) return;
+  if (!navigator.onLine) return showToast("Cần có mạng để cập nhật quyền.");
   const values = new FormData(form);
   const isAdmin = values.get("role") === "admin";
   const { error } = await syncClient.rpc("upsert_fill_assistant_member", {
@@ -1302,6 +1125,7 @@ if ("serviceWorker" in navigator) {
 var selectedMachineEditorId = null;
 var machineSchemaAvailable = true;
 var machineEditorDirty = false;
+var storageRuleDirty = false;
 
 function normalizeState(value) {
   const normalized = value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -1346,6 +1170,7 @@ function seedMachineConfig() {
     updated_at: now,
     _sync: "seeded"
   }));
+  invalidateDerived();
   StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -1373,20 +1198,38 @@ function seedProductStorageRules() {
     state.productStorageRules.push({ ...defaultRule, created_at: now, updated_at: now });
     changed = true;
   });
-  if (changed) StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (changed) {
+    invalidateDerived();
+    StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
 }
 
 function activeMachineConfigs() {
-  return (state.machineConfigs || []).filter(machine => !machine.deleted_at && !machine.archived);
+  const cache = derived();
+  return cache.activeMachines ||= (state.machineConfigs || []).filter(machine => !machine.deleted_at && !machine.archived);
 }
 
 function canonicalMachineName(name) {
-  const found = activeMachineConfigs().find(machine => machine.name === name
-    || machine.original_name === name || (machine.aliases || []).includes(name));
-  return found?.name || name;
+  const cache = derived();
+  if (!cache.canonicalNames) {
+    // Giữ đúng thứ tự ưu tiên của bản cũ: máy đứng trước thắng khi tên/tên gốc/bí danh trùng nhau.
+    const names = new Map();
+    activeMachineConfigs().forEach(machine => {
+      [machine.name, machine.original_name, ...(machine.aliases || [])].forEach(alias => {
+        if (alias != null && !names.has(alias)) names.set(alias, machine.name);
+      });
+    });
+    cache.canonicalNames = names;
+  }
+  return cache.canonicalNames.get(name) || name;
 }
 
 function config() {
+  const cache = derived();
+  return cache.config ||= buildConfig();
+}
+
+function buildConfig() {
   const base = window.FILL_BASE_CONFIG || window.FILL_CONFIG || { products: {}, machines: [], slots: [], initialCabin: [] };
   const machines = activeMachineConfigs();
   if (!machines.length) return base;
@@ -1430,12 +1273,28 @@ function currentCabin() {
   return cabinSnapshot;
 }
 
-function getRecentFill(product, machine, days) {
+function fillStatsByMachineProduct(days) {
+  // Gom Fill một lần cho mọi cặp máy-sản phẩm thay vì quét toàn bộ log cho từng cặp.
+  const cache = derived();
+  const cacheKey = `fillStats${days}`;
+  if (cache[cacheKey]) return cache[cacheKey];
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  return activeLogRows("fillLogs")
-    .filter(log => log.product === product && canonicalMachineName(log.machine) === machine && new Date(log.date) >= cutoff)
-    .reduce((sum, log) => sum + Number(log.qty || 0), 0);
+  cutoff.setDate(cutoff.getDate() - (days - 1)); // hôm nay + (days - 1) ngày trước = đúng `days` ngày lịch
+  const cutoffDate = localISODate(cutoff);
+  const stats = new Map();
+  activeLogRows("fillLogs").forEach(log => {
+    const key = `${canonicalMachineName(log.machine)}||${log.product}`;
+    if (!stats.has(key)) stats.set(key, { recent: 0, count: 0 });
+    const item = stats.get(key);
+    item.count += 1;
+    // Ngày lưu dạng YYYY-MM-DD theo giờ địa phương nên so chuỗi trực tiếp, tránh lệch múi giờ của new Date().
+    if (String(log.date || "") >= cutoffDate) item.recent += Number(log.qty || 0);
+  });
+  return cache[cacheKey] = stats;
+}
+
+function getRecentFill(product, machine, days) {
+  return fillStatsByMachineProduct(days).get(`${machine}||${product}`)?.recent || 0;
 }
 
 function expectedDemandBeforeNextVisit(machine, product) {
@@ -1481,7 +1340,7 @@ function setupForms() {
     if (!confirm("Reset về dữ liệu gốc trên thiết bị và Supabase?")) return;
     if (!navigator.onLine) return showToast("Cần kết nối mạng để reset dữ liệu Supabase.");
     if (!await syncNow()) return showToast("Chưa tải được dữ liệu Supabase. Hãy thử lại.");
-    state = authoritativeState(window.FILL_STATE || {});
+    state = authoritativeState(initialSeedSource());
     state.machineConfigs = [];
     state.machineSlots = [];
     state.productStorageRules = [];
@@ -1504,26 +1363,8 @@ function touchConfigRecord(item, deleted = false) {
   if (syncAccess) item.workspace_id ||= syncAccess.workspace_id;
   item._sync = "pending";
   if (deleted) item.deleted_at = now;
+  invalidateDerived();
   return item;
-}
-
-function addLayoutEditorRow(values = {}) {
-  const box = $("#layoutEditorRows");
-  if (!box) return;
-  const product = String(values.product || "");
-  const row = document.createElement("div");
-  row.className = "layout-editor-row";
-  row.dataset.id = values.id || "";
-  row.innerHTML = `
-    <input class="layout-slot" type="number" min="1" step="1" value="${Number(values.slot_number || values.slot || 1)}" aria-label="Số slot" />
-    <div class="layout-product-combo">
-      <input class="layout-product" type="text" list="layoutProductList" value="${htmlEscape(product)}" placeholder="Chọn hoặc gõ sản phẩm" aria-label="Chọn hoặc gõ tên sản phẩm" autocomplete="off" />
-      <button type="button" class="product-list-btn" data-open-product-list title="Mở danh sách sản phẩm" aria-label="Mở danh sách sản phẩm">⌄</button>
-    </div>
-    <input class="layout-capacity" type="number" min="1" step="1" value="${Number(values.capacity || values.max || 24)}" aria-label="Sức chứa" />
-    <button type="button" class="remove-row-btn" data-remove-layout-row aria-label="Xóa slot">×</button>`;
-  box.appendChild(row);
-  updateMachineSlotCount();
 }
 
 function updateMachineSlotCount() {
@@ -1546,13 +1387,15 @@ function addStorageRuleRow(values = {}) {
   box.appendChild(row);
 }
 
-function renderStorageRuleManager() {
+function renderStorageRuleManager(force = false) {
   const card = $("#storageRuleCard");
   const box = $("#storageRuleRows");
   if (!card || !box) return;
   const canManage = hasPermission("manage");
   card.classList.toggle("hidden", !canManage);
   if (!canManage) return;
+  // Không vẽ lại khi quản trị viên đang sửa dở, nếu không đồng bộ tự động sẽ xóa mất dữ liệu đang nhập.
+  if (storageRuleDirty && !force) return;
   box.innerHTML = "";
   activeStorageRules().sort((a, b) => String(a.product).localeCompare(String(b.product), "vi")).forEach(addStorageRuleRow);
   if (!box.children.length) defaultStorageRules().forEach(addStorageRuleRow);
@@ -1590,7 +1433,8 @@ function saveStorageRules() {
     touchConfigRecord(rule);
   });
   StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
-  cabinSnapshot = null;
+  invalidateDerived();
+  storageRuleDirty = false;
   renderStorageRuleManager();
   renderAll();
   queueAutoSync();
@@ -1615,11 +1459,11 @@ function renderMachineManager(force = false) {
   const machines = activeMachineConfigs();
   if (!selectedMachineEditorId || !machines.some(machine => machine.id === selectedMachineEditorId)) selectedMachineEditorId = machines[0]?.id || null;
   const select = $("#machineEditorSelect");
-  select.innerHTML = machines.map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("");
+  select.innerHTML = machines.map(machine => `<option value="${htmlEscape(machine.id)}">${htmlEscape(machine.name)}</option>`).join("");
   if (selectedMachineEditorId) select.value = selectedMachineEditorId;
   const source = $("#duplicateMachineSource");
   source.innerHTML = machines.filter(machine => machine.id !== selectedMachineEditorId)
-    .map(machine => `<option value="${machine.id}">${htmlEscape(machine.name)}</option>`).join("");
+    .map(machine => `<option value="${htmlEscape(machine.id)}">${htmlEscape(machine.name)}</option>`).join("");
   const machine = selectedMachineConfig();
   const form = $("#machineEditorForm");
   form.elements.name.value = machine?.name || "";
@@ -1699,7 +1543,7 @@ function saveMachineAndLayout(form) {
     touchConfigRecord(slot);
   });
   StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
-  cabinSnapshot = null;
+  invalidateDerived();
   machineEditorDirty = false;
   refreshOperationalSelects();
   renderMachineManager(true);
@@ -1730,13 +1574,6 @@ function setupMachineManagerEvents() {
     machineEditorDirty = true;
   });
   $("#layoutEditorRows")?.addEventListener("click", event => {
-    const listButton = event.target.closest("[data-open-product-list]");
-    if (listButton) {
-      const input = $(".layout-product", listButton.closest(".layout-product-combo"));
-      input.focus();
-      if (typeof input.showPicker === "function") input.showPicker();
-      return;
-    }
     const remove = event.target.closest("[data-remove-layout-row]");
     if (!remove) return;
     remove.closest(".layout-editor-row").remove();
@@ -1745,6 +1582,7 @@ function setupMachineManagerEvents() {
   });
   $("#machineEditorForm")?.addEventListener("submit", event => { event.preventDefault(); saveMachineAndLayout(event.target); });
   $("#archiveMachineBtn")?.addEventListener("click", () => {
+    if (!requirePermission("manage")) return;
     const machine = selectedMachineConfig();
     if (!machine || !confirm(`Lưu trữ ${machine.name}? Lịch sử cũ vẫn được giữ.`)) return;
     machine.archived = true;
@@ -1765,11 +1603,16 @@ function setupMachineManagerEvents() {
     updateMachineSlotCount();
     showToast("Đã sao chép layout. Bấm Lưu để xác nhận.");
   });
-  $("#addStorageRuleBtn")?.addEventListener("click", () => addStorageRuleRow({ pack: 24, shelf_per_pack: 0.5, max_packs: 2 }));
+  $("#addStorageRuleBtn")?.addEventListener("click", () => {
+    addStorageRuleRow({ pack: 24, shelf_per_pack: 0.5, max_packs: 2 });
+    storageRuleDirty = true;
+  });
+  $("#storageRuleForm")?.addEventListener("input", () => { storageRuleDirty = true; });
   $("#storageRuleRows")?.addEventListener("click", event => {
     const remove = event.target.closest("[data-remove-storage-rule]");
     if (!remove) return;
     remove.closest(".storage-rule-row").remove();
+    storageRuleDirty = true;
   });
   $("#storageRuleForm")?.addEventListener("submit", event => {
     event.preventDefault();
@@ -1782,7 +1625,8 @@ function prepareLocalRowsForWorkspace() {
   let changed = false;
   ["fillLogs", "nccLogs", "adjustLogs"].forEach(key => {
     state[key].forEach(item => {
-      if (item.workspace_id) return;
+      // Bản ghi gốc chỉ được đẩy lên sau khi biết cloud chưa có (xem promoteSeededRows).
+      if (item.workspace_id || item._sync === "seeded") return;
       stampRecordOwner(item);
       item._sync = "pending";
       changed = true;
@@ -1821,6 +1665,7 @@ function mergeConfigRows(key, remoteRows) {
     }
   });
   state[key] = [...map.values()];
+  invalidateDerived();
 }
 
 async function syncMachineConfig(publicOnly) {
@@ -1871,6 +1716,7 @@ async function syncNow() {
     return false;
   }
   let succeeded = false;
+  let needsFollowUpSync = false;
   syncBusy = true;
   syncStatusText = "Đang đồng bộ";
   renderSyncStatus();
@@ -1896,13 +1742,16 @@ async function syncNow() {
         await upsertPendingRows(meta, pending);
         pending.forEach(item => { item._sync = "synced"; });
       }
-      mergeRemoteRows(meta.key, await fetchAllSyncRows(meta));
+      const remoteRows = await fetchAllSyncRows(meta);
+      mergeRemoteRows(meta.key, remoteRows);
+      if (hasPermission(meta.permission) && promoteSeededRows(meta.key, remoteRows)) needsFollowUpSync = true;
     }
     await syncMachineConfig(false);
     StorageManager.setItem(STORAGE_KEY, JSON.stringify(state));
     lastSyncAt = new Date().toISOString();
     StorageManager.setItem("fill_assistant_last_sync_at", lastSyncAt);
     syncStatusText = "Đã đồng bộ";
+    if (needsFollowUpSync) setTimeout(queueAutoSync, 0);
     refreshOperationalSelects();
     renderAll();
     succeeded = true;
@@ -1982,24 +1831,7 @@ function renderOrders() {
 
 function exportJSON() {
   const blob = new Blob([JSON.stringify({ version: APP_VERSION, product: "Quản Lý Nhập Hàng", config: config(), state }, null, 2)], { type: "application/json" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `quan-ly-nhap-hang-backup-${todayISO()}.json`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-}
-
-function applyPermissions() {
-  const authenticated = Boolean(syncUser && syncAccess);
-  $$('[data-auth-required]').forEach(element => element.classList.toggle("hidden", !authenticated));
-  const authRequired = $(".tab.active[data-auth-required]");
-  if (authRequired && !authenticated) activateView("dashboard");
-  $("#memberAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
-  $("#machineAdminCard")?.classList.toggle("hidden", !hasPermission("manage"));
-  $("#storageRuleCard")?.classList.toggle("hidden", !hasPermission("manage"));
-  $("#syncConfigCard")?.classList.toggle("hidden", !(hasPermission("manage") && isSyncAdminMode()));
-  $("#exportHistoryXlsxBtn")?.classList.toggle("hidden", !authenticated);
-  $("#historyExportBox")?.classList.toggle("hidden", !authenticated);
+  downloadBlob(blob, `quan-ly-nhap-hang-backup-${todayISO()}.json`);
 }
 
 function authoritativeState(incomingState) {
@@ -2024,4 +1856,4 @@ function authoritativeState(incomingState) {
     result[key] = source.map(item => touchConfigRecord({ ...item }, Boolean(item.deleted_at)));
   });
   return result;
-}
+}

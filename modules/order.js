@@ -11,8 +11,16 @@ function activeStorageRules() {
 }
 
 function storageRuleForProduct(product) {
-  const name = String(product || "").toLocaleLowerCase("vi");
-  return activeStorageRules().find(rule => String(rule.product || "").toLocaleLowerCase("vi") === name) || null;
+  const cache = typeof derived === "function" ? derived() : {};
+  if (!cache.storageRules) {
+    const rules = new Map();
+    activeStorageRules().forEach(rule => {
+      const key = String(rule.product || "").toLocaleLowerCase("vi");
+      if (!rules.has(key)) rules.set(key, rule);
+    });
+    cache.storageRules = rules;
+  }
+  return cache.storageRules.get(String(product || "").toLocaleLowerCase("vi")) || null;
 }
 
 function isAquaProduct(product) {
@@ -80,7 +88,17 @@ function suggestedAquaOrderForLayout(stock, product, layout, projected) {
 }
 
 function machineProductLayout(machine, product) {
-  const slots = config().slots.filter(slot => slot.machine === machine && slot.product === product);
+  const cache = derived();
+  if (!cache.slotsByMachineProduct) {
+    const index = new Map();
+    config().slots.forEach(slot => {
+      const key = `${slot.machine}||${slot.product}`;
+      if (!index.has(key)) index.set(key, []);
+      index.get(key).push(slot);
+    });
+    cache.slotsByMachineProduct = index;
+  }
+  const slots = cache.slotsByMachineProduct.get(`${machine}||${product}`) || [];
   return {
     slotCount: slots.length,
     capacity: slots.reduce((sum, slot) => sum + Number(slot.max || 0), 0),
@@ -100,6 +118,12 @@ function suggestedOrderForLayout(stock, product, layout, projected) {
 }
 
 function buildOrderRows() {
+  const cache = derived();
+  cache.orderRows ||= computeOrderRows();
+  return cache.orderRows.slice();
+}
+
+function computeOrderRows() {
   const rawCabin = currentCabin();
   const keys = new Set();
   config().slots.forEach(slot => {

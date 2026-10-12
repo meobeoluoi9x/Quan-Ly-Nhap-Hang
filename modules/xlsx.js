@@ -1,6 +1,8 @@
 /* Quản Lý Nhập Hàng V5.4.11 - xlsx.js */
 function xlsxEscape(value) {
   return String(value ?? "")
+    // Ký tự điều khiển không hợp lệ trong XML làm Excel báo file hỏng.
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -63,13 +65,24 @@ function xlsxZipPart(path, content) {
   return { path, bytes: encoder.encode(content) };
 }
 
+const XLSX_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
 function xlsxCrc32(bytes) {
   let crc = -1;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
-  }
+  for (let i = 0; i < bytes.length; i++) crc = XLSX_CRC_TABLE[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
   return (crc ^ -1) >>> 0;
+}
+
+function xlsxSheetRef(sheetName) {
+  return `'${String(sheetName).replace(/'/g, "''")}'`;
 }
 
 function xlsxU16(value) {
@@ -131,11 +144,7 @@ function downloadXlsxWorkbook(sheets, filename) {
     xlsxZipPart("xl/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9EAF7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF94A3B8"/></left><right style="thin"><color rgb="FF94A3B8"/></right><top style="thin"><color rgb="FF94A3B8"/></top><bottom style="thin"><color rgb="FF94A3B8"/></bottom><diagonal/></border></borders><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1"/></cellXfs></styleSheet>`)
   ];
   safeSheets.forEach((sheet, index) => parts.push(xlsxZipPart(`xl/worksheets/sheet${index + 1}.xml`, xlsxSheetXml(sheet))));
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(xlsxBuildZip(parts));
-  link.download = filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`;
-  link.click();
-  URL.revokeObjectURL(link.href);
+  downloadBlob(xlsxBuildZip(parts), filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`);
 }
 
 function xlsxTitleRow(text, width) {
@@ -187,7 +196,7 @@ function exportNccXlsx() {
     rows: orderSheetRows(productRows, `Tổng hợp đơn nhập hàng NCC - ${todayISO()}`),
     widths: [18, 28, 10, 12, 12, 18, 10, 18, 28],
     freezeTopRow: true,
-    autoFilter: `A4:I${productRows.length + 5}`
+    autoFilter: `A4:I${productRows.length + 4}`
   }];
   machines.forEach(machine => {
     const machineRows = grouped[machine] || [];
@@ -197,7 +206,7 @@ function exportNccXlsx() {
       rows: orderSheetRows(machineRows, `Đơn nhập hàng NCC - ${machine}`),
       widths: [18, 28, 10, 12, 12, 18, 10, 18, 28],
       freezeTopRow: true,
-      autoFilter: `A4:I${machineRows.length + 5}`
+      autoFilter: `A4:I${machineRows.length + 4}`
     });
   });
   downloadXlsxWorkbook(sheets, `don-nhap-hang-${todayISO()}.xlsx`);
@@ -232,7 +241,7 @@ function exportCabinXlsx() {
     ],
     widths: [18, 30, 14, 16, 16],
     freezeTopRow: true,
-    autoFilter: `A4:E${totalRow}`
+    autoFilter: `A4:E${totalRow - 1}`
   }], `ton-cabin-${machine.replace(/[^a-zA-Z0-9_-]+/g, "-")}-${todayISO()}.xlsx`);
   showToast(`Đã xuất tồn cabin ${machine}.`);
 }
@@ -302,6 +311,7 @@ function historyFillLayoutRows(selectedMachines) {
 
 function historySummaryRows(rows, options = {}) {
   const summarySource = typeof options.summarySource === "function" ? options.summarySource : null;
+  const sheetNameFor = typeof options.sheetNameFor === "function" ? options.sheetNameFor : machine => xlsxSafeSheetName(machine);
   const nccTotals = options.nccTotals instanceof Map ? options.nccTotals : new Map();
   const groups = new Map();
   if (activeHistoryType === "fill" && Array.isArray(options.layoutRows)) {
@@ -338,7 +348,7 @@ function historySummaryRows(rows, options = {}) {
     const cabin = getCabinQty(item.machine, item.product);
     if (activeHistoryType === "fill") {
       const sourceRow = summarySource?.(item.machine, item.slot, item.product);
-      const machineStockCell = sourceRow ? { formula: `'${xlsxSafeSheetName(item.machine)}'!G${sourceRow}` } : "";
+      const machineStockCell = sourceRow ? { formula: `${xlsxSheetRef(sheetNameFor(item.machine))}!G${sourceRow}` } : "";
       const nccKey = `${canonicalMachineName(item.machine)}||${item.product}`;
       const nccQty = nccPrinted.has(nccKey) ? "" : Number(nccTotals.get(nccKey) || 0);
       nccPrinted.add(nccKey);
@@ -349,7 +359,7 @@ function historySummaryRows(rows, options = {}) {
       ]);
     }
     const sourceRow = summarySource?.(item.machine, "", item.product);
-    const manualStockCell = sourceRow ? { formula: `'${xlsxSafeSheetName(item.machine)}'!E${sourceRow}` } : "";
+    const manualStockCell = sourceRow ? { formula: `${xlsxSheetRef(sheetNameFor(item.machine))}!E${sourceRow}` } : "";
     return xlsxDataRow([item.machine, item.product, item.qty, cabin, manualStockCell, { formula: `D${row}+E${row}` }, { formula: `F${row}-C${row}` }, ""]);
   });
   const total = body.length + 5;
@@ -385,7 +395,9 @@ function historyDetailRows(rows) {
   const body = historySortRows(rows).map(item => activeHistoryType === "fill" ? xlsxDataRow([historyDateTime(item), item.machine, item.slot || "Chưa có slot", item.product, item.qty])
     : activeHistoryType === "ncc" ? xlsxDataRow([historyDateTime(item), item.machine, item.product, nccBoxes(item), item.qty])
       : activeHistoryType === "transfer" ? xlsxDataRow([historyDateTime(item), item.machine, transferTargets.get(`${item.batch_id || item.id}||${item.product}`) || "", item.product, Math.abs(Number(item.qty || 0))])
-        : xlsxDataRow([historyDateTime(item), item.machine, item.product, Number(item.actual) - Number(item.qty), item.actual, item.qty]));
+        : xlsxDataRow(hasStocktakeActual(item)
+          ? [historyDateTime(item), item.machine, item.product, Number(item.actual) - Number(item.qty), Number(item.actual), Number(item.qty)]
+          : [historyDateTime(item), item.machine, item.product, "", "", Number(item.qty)]));
   return [xlsxHeaderRow(header), ...body];
 }
 
@@ -416,6 +428,14 @@ function exportHistoryXlsx() {
   });
   const summaryWidth = activeHistoryType === "fill" ? [18, 10, 30, 16, 16, 14, 16, 16, 14, 24] : [18, 30, 16, 18, 16, 16, 14, 24];
   const summaryFilterLastCol = activeHistoryType === "fill" ? "J" : "H";
+  // Đặt tên sheet đúng thứ tự như lúc ghi file để công thức ở sheet Tổng hợp trỏ đúng sheet máy,
+  // kể cả khi tên máy bị rút gọn/trùng ("Tong hop", tên dài trên 31 ký tự...).
+  const usedSheetNames = new Set();
+  xlsxSafeSheetName("Tong hop", usedSheetNames);
+  xlsxSafeSheetName("Chi tiet", usedSheetNames);
+  const machineSheetNames = new Map();
+  machines.forEach(machine => machineSheetNames.set(canonicalMachineName(machine), xlsxSafeSheetName(machine, usedSheetNames)));
+  const sheetNameFor = machine => machineSheetNames.get(canonicalMachineName(machine)) || xlsxSafeSheetName(machine);
   const sourceRowsByKey = new Map();
   machines.forEach(machine => {
     const machineRows = sortedRows.filter(row => canonicalMachineName(row.machine) === canonicalMachineName(machine));
@@ -435,6 +455,7 @@ function exportHistoryXlsx() {
     rows: historySummaryRows(sortedRows, {
       nccTotals,
       layoutRows: fillLayoutRows,
+      sheetNameFor,
       summarySource(machine, slot, product) {
         return sourceRowsByKey.get(activeHistoryType === "fill" ? `${machine}||${slot}||${product}` : `${machine}||${product}`) || "";
       }
@@ -457,7 +478,7 @@ function exportHistoryXlsx() {
     const machineSummaryWidth = activeHistoryType === "fill" ? summaryWidth : [18, 30, 16, 18, 16, 16, 14, 24];
     const machineSummaryFilterLastCol = activeHistoryType === "fill" ? "J" : "H";
     sheets.push({
-      name: machine,
+      name: machineSheetNames.get(canonicalMachineName(machine)) || machine,
       rows: historySummaryRows(machineRows, { nccTotals, layoutRows: machineLayoutRows }),
       widths: machineSummaryWidth,
       freezeTopRow: true,

@@ -1,4 +1,15 @@
 /* Quản Lý Nhập Hàng V5.4.11 - history.js */
+function hasStocktakeActual(item) {
+  return item.actual !== null && item.actual !== undefined && item.actual !== "" && Number.isFinite(Number(item.actual));
+}
+
+function adjustAmountText(item) {
+  const diff = Number(item.qty || 0);
+  const signed = `${diff > 0 ? "+" : ""}${diff}`;
+  // Bản ghi điều chỉnh cũ không lưu tồn thực tế: chỉ hiện chênh lệch thay vì "NaN → undefined".
+  return hasStocktakeActual(item) ? `${Number(item.actual) - diff} → ${Number(item.actual)} (${signed})` : `${signed} sản phẩm`;
+}
+
 function isTransferRecord(item) {
   return String(item.reason || "").startsWith("Chuyển tồn:");
 }
@@ -108,7 +119,7 @@ function renderHistoryV4Runtime() {
     const permission = activeHistoryType === "fill" ? "fill" : activeHistoryType === "ncc" ? "receive" : "stocktake";
     const type = activeHistoryType === "fill" ? "Fill" : activeHistoryType === "ncc" ? "Ncc" : "Adjust";
     const amount = activeHistoryType === "ncc" ? `${nccBoxes(item)} thùng · ${item.qty} sản phẩm`
-      : activeHistoryType === "adjust" ? `${Number(item.actual) - Number(item.qty)} → ${item.actual} (${item.qty > 0 ? "+" : ""}${item.qty})`
+      : activeHistoryType === "adjust" ? adjustAmountText(item)
       : `${item.qty} sản phẩm`;
     const detail = activeHistoryType === "fill" && item.slot ? `Slot ${item.slot} · ${htmlEscape(item.product)}` : htmlEscape(item.product);
     const actions = hasPermission(permission) ? `<div class="actions">${activeHistoryType === "adjust" ? "" : `<button class="mini" data-history-action="edit" data-history-type="${activeHistoryType}" data-history-id="${htmlEscape(item.id)}">Sửa</button>`}<button class="mini danger" data-history-action="delete" data-history-type="${activeHistoryType}" data-history-id="${htmlEscape(item.id)}">Xóa</button></div>` : "";
@@ -118,7 +129,7 @@ function renderHistoryV4Runtime() {
 
 function deleteTransferBatch(batchId) {
   if (!requirePermission("stocktake") || !confirm("Xóa phiếu và hoàn lại tồn hai máy?")) return;
-  const rows = state.adjustLogs.filter(item => item.batch_id === batchId && isTransferRecord(item) && !item.deleted_at);
+  const rows = state.adjustLogs.filter(item => (item.batch_id || item.id) === batchId && isTransferRecord(item) && !item.deleted_at);
   if (!rows.length) return;
   rows.forEach(item => touchRecord(item, true));
   saveState();

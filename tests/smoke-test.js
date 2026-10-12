@@ -54,8 +54,7 @@ const context = vm.createContext({ console });
 ].forEach(name => vm.runInContext(extractLastOrderFunction(name), context));
 
 [
-  "htmlEscape",
-  "csvCell"
+  "htmlEscape"
 ].forEach(name => vm.runInContext(extractLastFunction(name), context));
 
 context.config = () => ({ products: {} });
@@ -100,8 +99,6 @@ assert.ok(Array.isArray(normalized.machineConfigs));
 assert.ok(Array.isArray(normalized.productStorageRules));
 
 assert.equal(context.htmlEscape(`<b title='x'>&</b>`), "&lt;b title=&#39;x&#39;&gt;&amp;&lt;/b&gt;");
-assert.equal(context.csvCell("=2+2"), `"'=2+2"`);
-assert.equal(context.csvCell(-5), `"-5"`);
 
 const draftStorage = new Map();
 const draftContext = vm.createContext({
@@ -122,9 +119,9 @@ assert.equal(draftContext.readFreshV42Draft("today").date, "2026-07-01");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
 assert.equal(new Set(ids).size, ids.length, "index.html contains duplicate ids");
-assert.match(html, /Quản Lý Nhập Hàng V5\.5\.0/);
-assert.match(html, /app\.js\?v=5\.5\.0/);
-runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=5\\.5\\.0`)));
+assert.match(html, /Quản Lý Nhập Hàng V5\.5\.2/);
+assert.match(html, /app\.js\?v=5\.5\.2/);
+runtimeModules.forEach(name => assert.match(html, new RegExp(`modules/${name.replace(".", "\\.")}\\?v=5\\.5\\.2`)));
 assert.match(html, /id="nccMachine"/);
 assert.match(html, /id="storageRuleForm"/);
 assert.match(html, /id="historyExportMachines"/);
@@ -213,15 +210,42 @@ assert.match(xlsxSource, /rows: historySummaryRows\(machineRows, \{ nccTotals, l
 assert.match(xlsxSource, /summarySource\(machine, slot, product\)/);
 assert.doesNotMatch(xlsxSource, /Doi chieu/);
 
+const xlsxContext = vm.createContext({});
+["xlsxEscape", "xlsxSheetRef"].forEach(name => vm.runInContext(extractLastFunctionFromSource(xlsxSource, name), xlsxContext));
+vm.runInContext(xlsxSource.match(/const XLSX_CRC_TABLE = [\s\S]*?\}\)\(\);/)[0] + "\n" + extractLastFunctionFromSource(xlsxSource, "xlsxCrc32") + "\nthis.XLSX_CRC32 = xlsxCrc32;", xlsxContext);
+assert.equal(xlsxContext.XLSX_CRC32(new TextEncoder().encode("123456789")), 0xcbf43926);
+assert.equal(xlsxContext.xlsxEscape("A\u0001<B>"), "A&lt;B&gt;");
+assert.equal(xlsxContext.xlsxSheetRef("Máy O'Hara"), "'Máy O''Hara'");
+
+const historySource = fs.readFileSync(path.join(root, "modules", "history.js"), "utf8");
+const historyContext = vm.createContext({});
+["hasStocktakeActual", "adjustAmountText"].forEach(name => vm.runInContext(extractLastFunctionFromSource(historySource, name), historyContext));
+assert.equal(historyContext.adjustAmountText({ qty: 5, actual: 0 }), "-5 → 0 (+5)");
+assert.equal(historyContext.adjustAmountText({ qty: -3 }), "-3 sản phẩm");
+
+const stocktakeSource = fs.readFileSync(path.join(root, "modules", "stocktake.js"), "utf8");
+const stocktakeContext = vm.createContext({
+  currentCabin: () => ({ "D3||Aqua": -5, "D3||Pepsi": 7 }),
+  config: () => ({ slots: [{ machine: "D3", product: "Aqua" }, { machine: "D3", product: "Pepsi" }] })
+});
+vm.runInContext(extractLastFunctionFromSource(stocktakeSource, "stocktakeItems"), stocktakeContext);
+jsonEqual(stocktakeContext.stocktakeItems("D3"), [{ product: "Aqua", qty: 0, raw: -5 }, { product: "Pepsi", qty: 7, raw: 7 }]);
+assert.match(stocktakeSource, /data-current="\$\{item\.raw\}"/);
+
+assert.match(source, /window\.FILL_INITIAL_STATE \|\| window\.FILL_STATE/);
+assert.match(source, /function promoteSeededRows\(/);
+assert.match(fs.readFileSync(path.join(root, "data.js"), "utf8"), /window\.FILL_INITIAL_STATE = /);
+
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
-assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.5.0");
+assert.equal(manifest.name, "Quản Lý Nhập Hàng V5.5.2");
 const serviceWorker = fs.readFileSync(path.join(root, "sw.js"), "utf8");
-assert.match(serviceWorker, /quan-ly-nhap-hang-v5-5-0/);
+assert.match(serviceWorker, /qlnh-cache-v\$\{ASSET_VERSION\}/);
+assert.match(serviceWorker, /ASSET_VERSION = .5\.5\.2./);
 runtimeModules.forEach(name => assert.match(serviceWorker, new RegExp(`\\./modules/${name.replace(".", "\\.")}`)));
 assert.doesNotMatch(extractLastFunctionFromSource(v42Source, "renderHistoryV4Runtime"), /onclick=/);
 assert.doesNotMatch(extractLastFunction("renderAudit"), /onclick=/);
 
-console.log("V5.5.0 smoke tests: PASS");
+console.log("V5.5.2 smoke tests: PASS");
 
 
 

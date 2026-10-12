@@ -5,7 +5,6 @@ function bootApp() {
   setupTabs();
   setupForms();
   setupSyncForms();
-  setupQuickPads();
   window.FILL_BASE_CONFIG ||= window.FILL_CONFIG;
   seedMachineConfig();
   seedProductStorageRules();

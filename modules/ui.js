@@ -101,8 +101,11 @@ function applyPermissions() {
 }
 
 function renderAll() {
-  cabinSnapshot = null;
-  renderRoute(); renderSummary(); renderOrders(); renderSlow(); renderCabin(); renderHistory(); renderAudit(); renderSelectedCabin(); renderSyncStatus();
+  invalidateDerived();
+  renderRoute(); renderSummary();
+  // Không vẽ lại đơn khi đang gõ số thùng, tránh đồng bộ nền làm mất ô đang nhập; sự kiện change sẽ tự vẽ lại.
+  if (!document.activeElement?.matches?.(".order-adjust-input")) renderOrders();
+  renderSlow(); renderCabin(); renderHistory(); renderAudit(); renderSelectedCabin(); renderSyncStatus();
   if (!$("#quickfill").classList.contains("active") || !$("#quickFillBox .slot-card")) renderQuickFill();
   if (!$("#audit").classList.contains("active") || !$("#stocktakeBox .stocktake-row")) renderStocktake();
   updateTransferPreview();
